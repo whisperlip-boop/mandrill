@@ -1,0 +1,28 @@
+# Build output
+bin/
+obj/
+publish/
+*.user
+.vs/
+
+# Logs
+logs/
+*.log
+
+# Not part of the product repository (owner policy): design material and WP-0 spike
+concept/
+spike/
+
+# Locally installed agent skills (npx skills add)
+.claude/skills/agent-cost-report/
+.agents/
+skills-lock.json
+
+# Local only, not part of the public repository (stage 7 cleanup):
+# project docs, tests, dev tools, agent instructions and the dev solution
+docs/
+tests/
+tools/
+CLAUDE.md
+.claude/
+Mandrill.Dev.sln

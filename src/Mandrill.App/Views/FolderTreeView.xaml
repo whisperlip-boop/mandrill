@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--  Folder tree of one pane (ui-spec §2 tree panel, AC-1.6–1.9). Nodes are mirrored by hand from TreeViewModel.  -->
+<UserControl
+    x:Class="Mandrill.App.Views.FolderTreeView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    xmlns:v="using:Mandrill.App.Views">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <!--  Owner F16/F19: Explorer's hover, selection and background (Themes/ExplorerItems.xaml).  -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Themes/ExplorerItems.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!--  Shell icons (owner F1): Quick access, drives and folders look as in Explorer; filled by FolderTreeView.  -->
+            <DataTemplate x:Key="NodeTemplate">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <v:TreeNodeIcon VerticalAlignment="Center" Node="{Binding Content}" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontFamily="{ThemeResource MandrillListFontFamily}"
+                        FontSize="{ThemeResource MandrillListFontSize}"
+                        Text="{Binding Content.Name}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </DataTemplate>
+            <DataTemplate x:Key="SeparatorTemplate">
+                <Rectangle
+                    Height="1"
+                    Margin="0,4"
+                    HorizontalAlignment="Stretch"
+                    Fill="{ThemeResource MandrillPaneBorderBrush}" />
+            </DataTemplate>
+            <Style x:Key="SeparatorItemStyle" TargetType="TreeViewItem">
+                <!--  Decoration only: without a label UIA would read it as "TreeViewNode".  -->
+                <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
+                <Setter Property="IsEnabled" Value="False" />
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="MinHeight" Value="9" />
+            </Style>
+            <v:TreeItemStyleSelector x:Key="StyleSelector" SeparatorStyle="{StaticResource SeparatorItemStyle}" />
+            <v:TreeItemTemplateSelector
+                x:Key="TemplateSelector"
+                NodeTemplate="{StaticResource NodeTemplate}"
+                SeparatorTemplate="{StaticResource SeparatorTemplate}" />
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <TreeView
+        x:Name="TreeControl"
+        Background="{ThemeResource MandrillContentBackgroundBrush}"
+        AutomationProperties.Name="{m:Tr Key=pane.tree}"
+        CanDragItems="False"
+        CanReorderItems="False"
+        ItemContainerStyleSelector="{StaticResource StyleSelector}"
+        ItemTemplateSelector="{StaticResource TemplateSelector}"
+        SelectionMode="Single" />
+</UserControl>

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Mandrill.App</RootNamespace>
+    <AssemblyName>Mandrill</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\mandrill.ico</ApplicationIcon>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <!-- Needed for PRI generation in unpackaged builds (spike S1). -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <MandrillBannedApis>true</MandrillBannedApis>
+    <MandrillUiProject>true</MandrillUiProject>
+
+    <!-- Unpackaged, self-contained publish (architecture §10 Packaging, ADR-0010). -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Owner SVGs (WP-1.16): colour icons load as SvgImageSource; the monochrome ones render from Icons/IconPaths.g.cs. -->
+    <Content Include="Assets\Icons\*.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\*.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+    <!-- Windows App SDK packages: Directory.Build.targets (MandrillUiProject), one version for app and tests. -->
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.2.251219" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mandrill.Core\Mandrill.Core.csproj" />
+    <ProjectReference Include="..\Mandrill.Presentation\Mandrill.Presentation.csproj" />
+  </ItemGroup>
+</Project>

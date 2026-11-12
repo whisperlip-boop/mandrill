@@ -1,0 +1,46 @@
+<Project>
+  <!-- Build-time layering rules (architecture §2). Targets run after the project file, so the flags are visible here. -->
+  <PropertyGroup>
+    <_MandrillAnalyzeBanned Condition="'$(MandrillBannedApis)' == 'true' or '$(MandrillNoUi)' == 'true'">true</_MandrillAnalyzeBanned>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_MandrillAnalyzeBanned)' == 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MandrillBannedApis)' == 'true'">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" Link="BannedSymbols.txt" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MandrillNoUi)' == 'true'">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.NoUi.txt" Link="BannedSymbols.NoUi.txt" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MandrillBannedApis)' == 'true' and '$(MandrillUiProject)' == 'true'">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.App.txt" Link="BannedSymbols.App.txt" />
+  </ItemGroup>
+
+  <!--
+    Windows App SDK for the UI projects (App, App.Tests), one version for both (WP-1.13). Component packages instead of the
+    Microsoft.WindowsAppSDK metapackage: no AI/ML/Search/Widgets parts (about 59 MB less). CommunityToolkit.WinUI.Controls.Sizers
+    depends on the old 1.6 metapackage, so the metapackage is pinned to 2.6.5 with ExcludeAssets="all"; the AI/ML/Search/Widgets
+    packages (and AI.MachineLearning, whose build targets need build 18362+) are excluded the same way.
+  -->
+  <ItemGroup Condition="'$(MandrillUiProject)' == 'true'">
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.6.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.6.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="2.6.5" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" Version="2.6.5" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.ML" Version="2.6.5" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Search" Version="2.6.5" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Widgets" Version="2.6.5" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" Version="2.4.89" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <!-- Only UI projects may reference the Windows App SDK / WinUI. Runs before restore collects package references. -->
+  <Target Name="MandrillCheckNoWindowsAppSdk" BeforeTargets="CollectPackageReferences;CoreCompile" Condition="'$(MandrillUiProject)' != 'true'">
+    <ItemGroup>
+      <_MandrillUiPackage Include="@(PackageReference)" Condition="$([System.String]::Copy('%(Identity)').StartsWith('Microsoft.WindowsAppSDK', System.StringComparison.OrdinalIgnoreCase))" />
+    </ItemGroup>
+    <Error Condition="'@(_MandrillUiPackage)' != ''" Code="MANDRILL001" Text="$(MSBuildProjectName) references @(_MandrillUiPackage). Only projects with MandrillUiProject=true (App, App.Tests) may reference the Windows App SDK (architecture §2)." />
+    <Error Condition="'$(UseWinUI)' == 'true'" Code="MANDRILL002" Text="$(MSBuildProjectName) sets UseWinUI=true without MandrillUiProject=true (architecture §2)." />
+  </Target>
+</Project>

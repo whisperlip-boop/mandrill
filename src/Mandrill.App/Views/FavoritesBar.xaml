@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Favorites bar (ui-spec §1, AC-1.28–1.32): star button (Add favorite), one button per favorite,
+    and a "»" menu for the favorites that do not fit. Never wraps.
+-->
+<UserControl
+    x:Class="Mandrill.App.Views.FavoritesBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--  Tab enters the bar once; arrows move across star button, favorites and "»" (ui-spec §4).  -->
+    <Grid
+        x:Name="Root"
+        ColumnSpacing="4"
+        TabFocusNavigation="Once"
+        XYFocusKeyboardNavigation="Enabled">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Button
+            x:Name="AddButton"
+            Width="28"
+            Height="28"
+            Padding="5"
+            Background="Transparent"
+            BorderThickness="0" />
+        <StackPanel
+            x:Name="ButtonPanel"
+            Grid.Column="1"
+            Orientation="Horizontal"
+            Spacing="2" />
+        <DropDownButton
+            x:Name="OverflowButton"
+            Grid.Column="2"
+            Height="28"
+            Padding="6,2"
+            Background="Transparent"
+            BorderThickness="0"
+            Visibility="Collapsed">
+            <DropDownButton.Flyout>
+                <MenuFlyout x:Name="OverflowMenu" Placement="BottomEdgeAlignedRight" />
+            </DropDownButton.Flyout>
+        </DropDownButton>
+    </Grid>
+</UserControl>

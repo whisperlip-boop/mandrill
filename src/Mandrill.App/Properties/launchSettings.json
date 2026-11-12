@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "Mandrill (Unpackaged)": {
+      "commandName": "Project"
+    },
+    "Mandrill (Unpackaged, en)": {
+      "commandName": "Project",
+      "environmentVariables": { "MANDRILL_LANG": "en" }
+    },
+    "Mandrill (Unpackaged, ko)": {
+      "commandName": "Project",
+      "environmentVariables": { "MANDRILL_LANG": "ko" }
+    }
+  }
+}

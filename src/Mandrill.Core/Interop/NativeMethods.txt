@@ -1,0 +1,172 @@
+// Phase 1 Win32/COM surface (architecture §9). CsWin32 generates internal bindings from this list.
+// Icons and type names (WP-1.6)
+SHGetFileInfo
+SHGetImageList
+Windows.Win32.UI.Controls.IImageList
+DestroyIcon
+GetIconInfo
+GetDIBits
+DeleteObject
+// Open, shortcuts, known folders (WP-1.6)
+ShellExecuteEx
+IShellLinkW
+IPersistFile
+ShellLink
+SHGetKnownFolderPath
+// Explorer settings and formatting (WP-1.2)
+SHGetSetSettings
+StrFormatKBSize
+StrFormatByteSize
+// Drives and platform (WP-1.2)
+GetLogicalDrives
+GetDriveType
+GetVolumeInformation
+GetUserDefaultUILanguage
+GetShortPathName
+// Removable drives: no "insert a disk" system box on not-ready media (stage 3 WP2)
+SetErrorMode
+GetErrorMode
+// This PC drive list: total and free space (ADR-0015)
+GetDiskFreeSpaceEx
+// Explorer item font for the lists (stage 3 WP4)
+SystemParametersInfoForDpi
+SYSTEM_PARAMETERS_INFO_ACTION
+LOGFONTW
+// Known folders (WP-1.2, AC-1.9)
+FOLDERID_Desktop
+FOLDERID_Documents
+FOLDERID_Downloads
+FOLDERID_Pictures
+FOLDERID_Profile
+CoTaskMemFree
+// Create-if-absent semantics for "New folder (n)" (WP-1.2)
+CreateDirectory
+// Explorer name order (WP-1.4, AC-1.22)
+StrCmpLogical
+// STA worker: OLE apartment, message-only window and pump (WP-1.6)
+OleInitialize
+OleUninitialize
+RegisterClassEx
+CreateWindowEx
+DestroyWindow
+DefWindowProc
+GetMessage
+TranslateMessage
+DispatchMessage
+PostMessage
+GetModuleHandle
+HWND_MESSAGE
+WM_APP
+PostQuitMessage
+// Icon pixels, image list sizes, open flags (WP-1.6)
+GetDC
+ReleaseDC
+SHIL_SMALL
+SHIL_LARGE
+SHIL_EXTRALARGE
+SHIL_JUMBO
+SEE_MASK_NOASYNC
+SEE_MASK_FLAG_NO_UI
+SLR_FLAGS
+IMAGE_LIST_DRAW_STYLE
+AssocQueryKey
+// Index thread background mode (WP-2.3, ADR-0008)
+SetThreadPriority
+GetCurrentThread
+// Stock drive icons for the folder tree, no media access (WP-1.14)
+SHGetStockIconInfo
+// Search window owned by the main window (WP-2.2b): GWLP_HWNDPARENT; GetWindow checks it in tests
+SetWindowLongPtr
+GetWindow
+// Elevated access grant for a denied folder (WP-1.16 F14)
+SEE_MASK_NOCLOSEPROCESS
+GetExitCodeProcess
+CloseHandle
+GetLongPathName
+// WP-3.0 spike leftovers: IFileOperation from a STA worker (R4/R5), shell APIs at >=260 chars, clipboard listener (ADR-0011)
+IFileOperation
+FileOperation
+IShellItem
+SHCreateItemFromParsingName
+FILEOPERATION_FLAGS
+SHParseDisplayName
+SHGetDesktopFolder
+ILFree
+EnumThreadWindows
+GetClassName
+GetWindowThreadProcessId
+IsWindowVisible
+OpenClipboard
+CloseClipboard
+EmptyClipboard
+SetClipboardData
+GetClipboardData
+IsClipboardFormatAvailable
+EnumClipboardFormats
+RegisterClipboardFormat
+GetClipboardSequenceNumber
+AddClipboardFormatListener
+RemoveClipboardFormatListener
+WM_CLIPBOARDUPDATE
+DragQueryFile
+DROPFILES
+GlobalAlloc
+GlobalLock
+GlobalUnlock
+GlobalFree
+GlobalSize
+EnumWindows
+WM_CLOSE
+// Shell context menu on a dedicated STA with a hidden owner window (WP-3.1, architecture §7/§9, S4)
+IShellFolder
+IContextMenu
+IContextMenu2
+IContextMenu3
+CMINVOKECOMMANDINFOEX
+SHBindToObject
+CreatePopupMenu
+DestroyMenu
+TrackPopupMenuEx
+SetForegroundWindow
+EndMenu
+ClientToScreen
+GetMenuItemCount
+GetMenuItemID
+CMF_NORMAL
+CMF_EXPLORE
+CMF_CANRENAME
+CMF_EXTENDEDVERBS
+CMIC_MASK_PTINVOKE
+CMIC_MASK_SHIFT_DOWN
+GCS_VERBW
+WM_INITMENUPOPUP
+WM_DRAWITEM
+WM_MEASUREITEM
+WM_MENUCHAR
+WM_NULL
+// WP-3.1 fix round: Mandrill's own native-menu items (ids >= 0x8000), modality check of shell confirmations (tests)
+AppendMenu
+IsWindowEnabled
+SEE_MASK_INVOKEIDLIST
+SHELLEXECUTEINFOW
+// WP-3.1 follow-ups: own-item de-duplication, Shift at invoke time
+GetMenuString
+GetKeyState
+// WP-3.2 ShellFileOperations: progress sink (per-item results, final names), display names, FOFX flags
+IFileOperationProgressSink
+SIGDN
+// WP-3.3 Open with (replaces the P1 no-association error, §15 (d))
+SHOpenWithDialog
+OPENASINFO
+OPEN_AS_INFO_FLAGS
+// WP-3.3 QA: retry a clipboard read the other app blocked
+SetTimer
+KillTimer
+WM_TIMER
+// WP-3.4: the system ANSI code page for an ANSI FileDrop
+GetACP
+// WP-1.20 owner #7: shell thumbnails at medium icons and larger
+IShellItemImageFactory
+SIIGBF
+GetObject
+BITMAP

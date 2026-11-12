@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="Mandrill.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    xmlns:v="using:Mandrill.App.Views">
+    <!--  Hidden: the window shortcuts must not show their key as an automatic tooltip over the window (owner round 5 #11).  -->
+    <Grid
+        x:Name="Root"
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        KeyboardAcceleratorPlacementMode="Hidden">
+        <Grid.Resources>
+            <Style x:Key="TopBarButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="28" />
+                <Setter Property="Height" Value="28" />
+                <Setter Property="Padding" Value="5" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Menu bar (AC-1.37, ui-spec §1). Mnemonics Alt+F / Alt+V / Alt+H. -->
+        <MenuBar x:Name="MainMenu">
+            <!--
+                A menu bar item's title is an inner Button with a transparent fill, whose hover/press text keys would replace
+                the item's text colour: in the app's High contrast that is black on the black hover (owner round 6 #1). Keep
+                the item's text colour (white there; the WinUI default in Light/Dark). Not tracked by AppTheme, so the palette
+                cannot override it.
+            -->
+            <MenuBar.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <StaticResource x:Key="ButtonForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                            <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="TextFillColorPrimaryBrush" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Default">
+                            <StaticResource x:Key="ButtonForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                            <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="TextFillColorPrimaryBrush" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </MenuBar.Resources>
+            <MenuBarItem Title="{m:Tr Key=menu.file}" AccessKey="F">
+                <MenuFlyoutItem
+                    x:Name="SettingsItem"
+                    Command="{x:Bind ViewModel.OpenSettingsCommand}"
+                    Text="{m:Tr Key=menu.file.settings}" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Command="{x:Bind ViewModel.ExitCommand}"
+                    KeyboardAcceleratorTextOverride="Alt+F4"
+                    Text="{m:Tr Key=menu.file.exit}" />
+            </MenuBarItem>
+            <MenuBarItem Title="{m:Tr Key=menu.view}" AccessKey="V">
+                <MenuFlyoutSubItem x:Name="LayoutMenu" Text="{m:Tr Key=menu.view.layout}" />
+                <ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowHidden, Mode=TwoWay}" Text="{m:Tr Key=menu.view.showHidden}" />
+                <MenuFlyoutItem Command="{x:Bind ViewModel.ToggleTreeCommand}" Text="{m:Tr Key=menu.view.toggleTree}">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="B" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    x:Name="AddPaneItem"
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+="
+                    Command="{x:Bind ViewModel.AddPaneCommand}"
+                    Text="{m:Tr Key=menu.view.addPane}" />
+                <MenuFlyoutItem
+                    x:Name="RemovePaneItem"
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+-"
+                    Command="{x:Bind ViewModel.RemovePaneCommand}"
+                    Text="{m:Tr Key=menu.view.removePane}" />
+            </MenuBarItem>
+            <MenuBarItem Title="{m:Tr Key=menu.help}" AccessKey="H">
+                <MenuFlyoutItem Command="{x:Bind ViewModel.AboutCommand}" Text="{m:Tr Key=menu.help.about}" />
+            </MenuBarItem>
+        </MenuBar>
+
+        <!--  Favorites bar (ui-spec §1, 32 px): favorites on the left (WP-1.12), pane count and layout picker on the right.  -->
+        <Grid
+            x:Name="TopBar"
+            Grid.Row="1"
+            Height="32"
+            Padding="4,0"
+            ColumnSpacing="2">
+            <!--  Owner F13: hover and pressed feedback for the transparent toolbar buttons (Themes/SubtleButtons.xaml).  -->
+            <Grid.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceDictionary Source="ms-appx:///Themes/SubtleButtons.xaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
+            </Grid.Resources>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid x:Name="FavoritesArea" />
+            <Button
+                x:Name="AddPaneButton"
+                Grid.Column="1"
+                Command="{x:Bind ViewModel.AddPaneCommand}"
+                Style="{StaticResource TopBarButtonStyle}" />
+            <Button
+                x:Name="RemovePaneButton"
+                Grid.Column="2"
+                Command="{x:Bind ViewModel.RemovePaneCommand}"
+                Style="{StaticResource TopBarButtonStyle}" />
+            <DropDownButton
+                x:Name="LayoutPicker"
+                Grid.Column="3"
+                Height="28"
+                Padding="6,2"
+                Background="Transparent"
+                BorderThickness="0">
+                <DropDownButton.Flyout>
+                    <Flyout x:Name="LayoutFlyout" Placement="BottomEdgeAlignedRight">
+                        <GridView
+                            x:Name="LayoutTiles"
+                            AutomationProperties.Name="{m:Tr Key=window.layout}"
+                            IsItemClickEnabled="True"
+                            ItemClick="OnLayoutTileClick"
+                            SelectionMode="Single">
+                            <GridView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsWrapGrid MaximumRowsOrColumns="4" Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </GridView.ItemsPanel>
+                        </GridView>
+                    </Flyout>
+                </DropDownButton.Flyout>
+            </DropDownButton>
+        </Grid>
+
+        <!--  Pane area: 3×3 layout grid (architecture §6).  -->
+        <v:LayoutHost x:Name="PaneArea" Grid.Row="2" />
+
+        <!--  Status bar (ui-spec §1): item count or selection, a free message area, then the index state (WP-2.3b).  -->
+        <Grid
+            Grid.Row="3"
+            Padding="8,2"
+            Background="{ThemeResource MandrillStatusBarBackgroundBrush}"
+            ColumnSpacing="24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" MaxWidth="480" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="PaneText"
+                Foreground="{ThemeResource MandrillStatusBarForegroundBrush}"
+                TextTrimming="CharacterEllipsis" />
+            <TextBlock
+                x:Name="CountText"
+                Grid.Column="1"
+                Foreground="{ThemeResource MandrillStatusBarForegroundBrush}" />
+            <TextBlock
+                x:Name="StatusText"
+                Grid.Column="2"
+                Foreground="{ThemeResource MandrillStatusBarForegroundBrush}"
+                TextTrimming="CharacterEllipsis" />
+            <TextBlock
+                x:Name="IndexText"
+                Grid.Column="3"
+                MaxWidth="320"
+                Foreground="{ThemeResource MandrillStatusBarForegroundBrush}"
+                TextTrimming="CharacterEllipsis"
+                Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</Window>

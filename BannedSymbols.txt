@@ -1,0 +1,18 @@
+T:System.IO.File;File system access belongs in Mandrill.Core
+T:System.IO.FileInfo;File system access belongs in Mandrill.Core
+T:System.IO.FileStream;File system access belongs in Mandrill.Core
+T:System.IO.FileSystemInfo;File system access belongs in Mandrill.Core
+T:System.IO.FileSystemWatcher;File system access belongs in Mandrill.Core
+T:System.IO.Directory;File system access belongs in Mandrill.Core
+T:System.IO.DirectoryInfo;File system access belongs in Mandrill.Core
+T:System.IO.DriveInfo;File system access belongs in Mandrill.Core
+M:System.Diagnostics.Process.Start;Shell access belongs in Mandrill.Core
+M:System.Diagnostics.Process.Start(System.String);Shell access belongs in Mandrill.Core
+M:System.Diagnostics.Process.Start(System.String,System.String);Shell access belongs in Mandrill.Core
+M:System.Diagnostics.Process.Start(System.String,System.Collections.Generic.IEnumerable{System.String});Shell access belongs in Mandrill.Core
+M:System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo);Shell access belongs in Mandrill.Core
+T:Microsoft.Win32.Registry;Registry access belongs in Mandrill.Core
+T:Microsoft.Win32.RegistryKey;Registry access belongs in Mandrill.Core
+N:Windows.Win32;Win32 interop belongs in Mandrill.Core
+M:Windows.Storage.StorageFile.GetFileFromPathAsync(System.String);File system access belongs in Mandrill.Core
+M:Windows.Storage.StorageFolder.GetFolderFromPathAsync(System.String);File system access belongs in Mandrill.Core

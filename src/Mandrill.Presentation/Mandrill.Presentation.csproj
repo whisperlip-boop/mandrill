@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Mandrill.Presentation</RootNamespace>
+    <MandrillBannedApis>true</MandrillBannedApis>
+    <MandrillNoUi>true</MandrillNoUi>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Mandrill.Core\Mandrill.Core.csproj" />
+  </ItemGroup>
+</Project>

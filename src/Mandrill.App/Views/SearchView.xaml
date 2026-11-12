@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Search popup content (ui-spec §3, architecture §3 WP-2.2b): query row, scope line, indexing strip, a virtualized
+    5-column result list (rows filled in code, icons through RowIconBinder) and the footer. Hosted by SearchWindow.
+-->
+<UserControl
+    x:Class="Mandrill.App.Views.SearchView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    KeyboardAcceleratorPlacementMode="Hidden">
+    <!--  Hidden: Ctrl+F / Alt+S / Ctrl+Shift+C must not show their key as an automatic tooltip (QA s2).  -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <!--  Hover and selection as in the panes (owner F16, Themes/ExplorerItems.xaml); merged here, where the row
+                  template is defined, because its theme resources resolve from there.  -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Themes/ExplorerItems.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="ResultItemStyle" TargetType="ListViewItem">
+                <Setter Property="FontFamily" Value="{ThemeResource MandrillListFontFamily}" />
+                <Setter Property="FontSize" Value="{ThemeResource MandrillListFontSize}" />
+                <Setter Property="MinHeight" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            </Style>
+            <Style x:Key="ColumnDividerStyle" TargetType="Rectangle">
+                <Setter Property="Fill" Value="{ThemeResource MandrillColumnDividerBrush}" />
+            </Style>
+            <!--  Result row: [icon + filename] [extension] [path] [size] [date]; column widths are set in code.  -->
+            <DataTemplate x:Key="ResultRowTemplate">
+                <Grid Height="24" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <Grid Padding="6,0,4,0" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center">
+                            <FontIcon FontSize="14" Opacity="{ThemeResource MandrillRowTertiaryOpacity}" />
+                            <Image Stretch="Uniform" />
+                        </Grid>
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Column="1"
+                        Padding="4,0"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Grid.Column="2"
+                        Padding="4,0"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Grid.Column="3"
+                        Padding="4,0,10,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}" />
+                    <TextBlock
+                        Grid.Column="4"
+                        Padding="4,0"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
+                        TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </DataTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <!--  Own page background: the popup is a separate window, so the app Theme must paint it (C1).  -->
+    <Grid
+        Padding="8"
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        RowSpacing="6">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox
+                x:Name="QueryBox"
+                AutomationProperties.Name="{m:Tr Key=search.placeholder}"
+                PlaceholderText="{m:Tr Key=search.placeholder}" />
+            <Button
+                x:Name="SearchButton"
+                Grid.Column="1"
+                MinWidth="80"
+                Style="{StaticResource AccentButtonStyle}" />
+            <Button
+                x:Name="RefreshButton"
+                Grid.Column="2"
+                MinWidth="80"
+                Content="{m:Tr Key=search.refresh}" />
+        </Grid>
+
+        <TextBlock
+            x:Name="ScopeText"
+            Grid.Row="1"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            TextTrimming="CharacterEllipsis" />
+
+        <Border
+            x:Name="IndexingStrip"
+            Grid.Row="2"
+            Padding="8,4"
+            Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+            CornerRadius="4"
+            Visibility="Collapsed">
+            <TextBlock Text="{m:Tr Key=search.indexing}" TextWrapping="Wrap" />
+        </Border>
+
+        <Grid
+            x:Name="HeaderClip"
+            Grid.Row="3"
+            Height="26"
+            BorderBrush="{ThemeResource MandrillPaneBorderBrush}"
+            BorderThickness="0,0,0,1">
+            <Grid.Clip>
+                <RectangleGeometry x:Name="HeaderClipRect" />
+            </Grid.Clip>
+            <Grid x:Name="Header" HorizontalAlignment="Left" />
+        </Grid>
+
+        <TextBlock
+            x:Name="CentreText"
+            Grid.Row="4"
+            Margin="16"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Canvas.ZIndex="1"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            IsHitTestVisible="False"
+            TextAlignment="Center"
+            TextWrapping="Wrap" />
+        <ListView
+            x:Name="Results"
+            Grid.Row="4"
+            AutomationProperties.Name="{m:Tr Key=search.results}"
+            CanDragItems="True"
+            IsItemClickEnabled="False"
+            ItemContainerStyle="{StaticResource ResultItemStyle}"
+            ItemTemplate="{StaticResource ResultRowTemplate}"
+            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+            ScrollViewer.HorizontalScrollMode="Auto"
+            SelectionMode="Extended" />
+
+        <Grid Grid.Row="5" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="120" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="FooterText"
+                VerticalAlignment="Center"
+                TextTrimming="CharacterEllipsis" />
+            <HyperlinkButton
+                x:Name="RetryLink"
+                Grid.Column="1"
+                Content="{m:Tr Key=search.retry}"
+                Visibility="Collapsed" />
+            <ProgressBar
+                x:Name="Busy"
+                Grid.Column="2"
+                VerticalAlignment="Center"
+                IsIndeterminate="True"
+                Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</UserControl>

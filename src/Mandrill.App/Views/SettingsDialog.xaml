@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--  Settings (AC-1.34, AC-1.3b, AC-2.10): language, theme, favorites bar, default arrangements for 2 and 3 panes, index.  -->
+<ContentDialog
+    x:Class="Mandrill.App.Views.SettingsDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    CloseButtonText="{m:Tr Key=dialog.settings.cancel}"
+    DefaultButton="Primary"
+    PrimaryButtonText="{m:Tr Key=dialog.settings.save}"
+    Title="{m:Tr Key=dialog.settings.title}">
+    <!--
+        Owner round 5 #6: the scroll bar sits in the dialog's 24 px right padding (ContentDialogPadding) at the edge, and the
+        content keeps that padding as its own margin, so the bar never covers a control.
+    -->
+    <ScrollViewer Margin="0,0,-24,0" VerticalScrollBarVisibility="Auto">
+        <StackPanel MinWidth="380" Margin="0,0,24,0" Spacing="16">
+            <StackPanel Spacing="4">
+                <RadioButtons x:Name="LanguageChoice" Header="{m:Tr Key=dialog.settings.language}" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{ThemeResource CaptionTextBlockStyle}"
+                    Text="{m:Tr Key=dialog.settings.language.restart}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <RadioButtons x:Name="ThemeChoice" Header="{m:Tr Key=dialog.settings.theme}" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{ThemeResource CaptionTextBlockStyle}"
+                    Text="{m:Tr Key=dialog.settings.theme.highContrast}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch
+                x:Name="FavoritesBarToggle"
+                Header="{m:Tr Key=dialog.settings.favoritesBar}"
+                OffContent="{m:Tr Key=dialog.settings.off}"
+                OnContent="{m:Tr Key=dialog.settings.on}" />
+            <StackPanel Spacing="8">
+                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{m:Tr Key=dialog.settings.layoutDefaults}" TextWrapping="Wrap" />
+                <RadioButtons x:Name="TwoPaneChoice" Header="{m:Tr Key=dialog.settings.layoutDefaults.two}" />
+                <RadioButtons x:Name="ThreePaneChoice" Header="{m:Tr Key=dialog.settings.layoutDefaults.three}" />
+            </StackPanel>
+            <!--  Index (WP-2.6): excluded folders and the rescan interval; applied live after Save.  -->
+            <StackPanel Spacing="8">
+                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{m:Tr Key=dialog.settings.index}" TextWrapping="Wrap" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{ThemeResource CaptionTextBlockStyle}"
+                    Text="{m:Tr Key=dialog.settings.index.hint}"
+                    TextWrapping="Wrap" />
+                <ListView
+                    x:Name="ExcludeList"
+                    MaxHeight="180"
+                    AutomationProperties.Name="{m:Tr Key=dialog.settings.index.list}"
+                    IsItemClickEnabled="False"
+                    SelectionMode="None" />
+                <TextBlock
+                    x:Name="ExcludeEmpty"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{m:Tr Key=dialog.settings.index.empty}" />
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ExcludePath" PlaceholderText="{m:Tr Key=dialog.settings.index.path}" />
+                    <Button
+                        x:Name="ExcludeAdd"
+                        Grid.Column="1"
+                        Content="{m:Tr Key=dialog.settings.index.add}" />
+                    <Button
+                        x:Name="ExcludeBrowse"
+                        Grid.Column="2"
+                        Content="{m:Tr Key=dialog.settings.index.browse}" />
+                    <!--  Theme-aware sources of the message colours (read in code; never shown): follow the dialog's theme.  -->
+                    <Border
+                        x:Name="ErrorSwatch"
+                        Background="{ThemeResource SystemFillColorCriticalBrush}"
+                        Visibility="Collapsed" />
+                    <Border
+                        x:Name="HintSwatch"
+                        Background="{ThemeResource TextFillColorSecondaryBrush}"
+                        Visibility="Collapsed" />
+                </Grid>
+                <TextBlock
+                    x:Name="ExcludeMessage"
+                    Style="{ThemeResource CaptionTextBlockStyle}"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
+                <NumberBox
+                    x:Name="RescanHoursBox"
+                    Header="{m:Tr Key=dialog.settings.index.rescan}"
+                    HorizontalAlignment="Left"
+                    MinWidth="160"
+                    SmallChange="1"
+                    LargeChange="24"
+                    SpinButtonPlacementMode="Compact" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    App-level brush aliases. Only theme resources, no colour literals (AC-1.39, ADR-0014), except MandrillMainInstructionBrush:
+    Explorer's fixed main-instruction blue in the folder-access prompt (owner, stage 4); High contrast keeps the system text.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <StaticResource x:Key="MandrillPaneBorderBrush" ResourceKey="CardStrokeColorDefaultBrush" />
+            <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <SolidColorBrush
+                x:Key="MandrillRubberBandFillBrush"
+                Opacity="0.25"
+                Color="{ThemeResource SystemAccentColor}" />
+            <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemFillColorCriticalBrush" />
+            <SolidColorBrush x:Key="MandrillMainInstructionBrush" Color="#003399" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <StaticResource x:Key="MandrillPaneBorderBrush" ResourceKey="CardStrokeColorDefaultBrush" />
+            <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <SolidColorBrush
+                x:Key="MandrillRubberBandFillBrush"
+                Opacity="0.25"
+                Color="{ThemeResource SystemAccentColor}" />
+            <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemFillColorCriticalBrush" />
+            <SolidColorBrush x:Key="MandrillMainInstructionBrush" Color="#99EBFF" />
+            <!--  Menu bar hover: the subtle fills are barely visible in Dark (owner round 6 #4), as in SubtleButtons.xaml.  -->
+            <StaticResource x:Key="MenuBarItemBackgroundPointerOver" ResourceKey="SystemControlBackgroundListMediumBrush" />
+            <StaticResource x:Key="MenuBarItemBackgroundPressed" ResourceKey="SystemControlBackgroundListLowBrush" />
+            <StaticResource x:Key="MenuBarItemBackgroundSelected" ResourceKey="SystemControlBackgroundListLowBrush" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <StaticResource x:Key="MandrillPaneBorderBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="SystemColorHighlightColorBrush" />
+            <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="MandrillRubberBandFillBrush" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="SystemColorHighlightColorBrush" />
+            <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemColorHighlightColorBrush" />
+            <StaticResource x:Key="MandrillMainInstructionBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

@@ -1,0 +1,29 @@
+<Project>
+  <!-- Shared settings for every project in Mandrill.sln (architecture §1, CLAUDE.md C# rules). -->
+  <PropertyGroup>
+    <!-- One TFM for all projects: Core needs Windows SDK projections (Windows.Storage, ADR-0011). -->
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PublishDocumentationFile>false</PublishDocumentationFile>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+    <Version>0.1.0</Version>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <!-- Keep the plain version; 1.0.0 is assigned by the owner at release. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Company>Mandrill</Company>
+    <Product>Mandrill</Product>
+  </PropertyGroup>
+  <!--
+    Project flags (set in the project file, evaluated in Directory.Build.targets):
+    MandrillBannedApis = true  App, Presentation: no file system / shell / registry / Win32 (BannedSymbols.txt)
+    MandrillNoUi       = true  Core, Presentation: no Microsoft.UI (BannedSymbols.NoUi.txt)
+    MandrillUiProject  = true  App, App.Tests: the only projects allowed to reference Microsoft.WindowsAppSDK
+  -->
+</Project>

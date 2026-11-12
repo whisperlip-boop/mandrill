@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    File list of one pane (architecture §5): Details (ListView), Icons and List (GridView). Only the current mode's control is
+    in the tree. Templates have no bindings; FileListView.ContainerContentChanging fills them (S2).
+-->
+<UserControl
+    x:Class="Mandrill.App.Views.FileListView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <!--  Owner F16/F19: Explorer's hover, selection and background (Themes/ExplorerItems.xaml).  -->
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Themes/ExplorerItems.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!--  Explorer's focused row: a 1 px border (WinUI draws it for keyboard focus only).  -->
+            <Style x:Key="DetailsItemStyle" TargetType="ListViewItem">
+                <Setter Property="FontFamily" Value="{ThemeResource MandrillListFontFamily}" />
+                <Setter Property="FontSize" Value="{ThemeResource MandrillListFontSize}" />
+                <Setter Property="MinHeight" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                <Setter Property="FocusVisualMargin" Value="0" />
+                <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource MandrillItemFocusBorderBrush}" />
+                <Setter Property="FocusVisualPrimaryThickness" Value="{ThemeResource MandrillItemFocusThickness}" />
+                <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource MandrillItemFocusSecondaryThickness}" />
+            </Style>
+            <!--  Details header divider line (ColumnGripper): a theme resource, so it follows light/dark/high contrast.  -->
+            <Style x:Key="ColumnDividerStyle" TargetType="Rectangle">
+                <Setter Property="Fill" Value="{ThemeResource MandrillColumnDividerBrush}" />
+            </Style>
+            <!--
+                The panel's ItemWidth/ItemHeight are the cell size: no GridViewItem minimum (44 px) above them, or List rows
+                (22 px) are taller than their slot and overlap each other, cutting the text off. The touch target follows the
+                cell size.
+            -->
+            <Style x:Key="GridItemStyle" TargetType="GridViewItem">
+                <Setter Property="FontFamily" Value="{ThemeResource MandrillListFontFamily}" />
+                <Setter Property="FontSize" Value="{ThemeResource MandrillListFontSize}" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Margin" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                <Setter Property="FocusVisualMargin" Value="0" />
+                <Setter Property="FocusVisualPrimaryBrush" Value="{ThemeResource MandrillItemFocusBorderBrush}" />
+                <Setter Property="FocusVisualPrimaryThickness" Value="{ThemeResource MandrillItemFocusThickness}" />
+                <Setter Property="FocusVisualSecondaryThickness" Value="{ThemeResource MandrillItemFocusSecondaryThickness}" />
+            </Style>
+
+            <!--  Icons fill rows left to right; List fills columns top to bottom and scrolls horizontally.  -->
+            <ItemsPanelTemplate x:Key="IconsPanelTemplate">
+                <ItemsWrapGrid Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+            <ItemsPanelTemplate x:Key="ListPanelTemplate">
+                <ItemsWrapGrid Orientation="Vertical" />
+            </ItemsPanelTemplate>
+
+            <!--  Details row: [icon + name] [date] [type] [size]; column widths are set in code.  -->
+            <DataTemplate x:Key="DetailsRowTemplate">
+                <Grid Height="24" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <Grid Padding="6,0,4,0" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid
+                            Width="16"
+                            Height="16"
+                            VerticalAlignment="Center">
+                            <FontIcon FontSize="14" Opacity="{ThemeResource MandrillRowTertiaryOpacity}" />
+                            <Image Stretch="Uniform" />
+                        </Grid>
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Column="1"
+                        Padding="4,0"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Grid.Column="2"
+                        Padding="4,0"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Grid.Column="3"
+                        Padding="4,0,10,0"
+                        VerticalAlignment="Center"
+                        Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
+                        TextAlignment="Right"
+                        TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </DataTemplate>
+
+            <!--  Icons cell: icon above a label of at most two lines.  -->
+            <DataTemplate x:Key="IconsCellTemplate">
+                <Grid Padding="4" RowSpacing="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid HorizontalAlignment="Center">
+                        <FontIcon Opacity="{ThemeResource MandrillRowTertiaryOpacity}" />
+                        <Image Stretch="Uniform" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Row="1"
+                        HorizontalAlignment="Center"
+                        MaxLines="2"
+                        TextAlignment="Center"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap" />
+                </Grid>
+            </DataTemplate>
+
+            <!--  List cell: 16 px icon and one line of name.  -->
+            <DataTemplate x:Key="ListCellTemplate">
+                <Grid Padding="4,0" ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        Width="16"
+                        Height="16"
+                        VerticalAlignment="Center">
+                        <FontIcon FontSize="14" Opacity="{ThemeResource MandrillRowTertiaryOpacity}" />
+                        <Image Stretch="Uniform" />
+                    </Grid>
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </DataTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Background="{ThemeResource MandrillContentBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--  Details header (columns, sort arrow, resize grippers); built in code, scrolled with the list.  -->
+        <Grid
+            x:Name="HeaderClip"
+            Height="26"
+            BorderBrush="{ThemeResource MandrillPaneBorderBrush}"
+            BorderThickness="0,0,0,1"
+            Visibility="Collapsed">
+            <Grid.Clip>
+                <RectangleGeometry x:Name="HeaderClipRect" />
+            </Grid.Clip>
+            <Grid x:Name="Header" HorizontalAlignment="Left" />
+        </Grid>
+
+        <Grid x:Name="ListHost" Grid.Row="1" />
+
+        <Canvas
+            x:Name="BandCanvas"
+            Grid.Row="1"
+            IsHitTestVisible="False">
+            <Rectangle
+                x:Name="Band"
+                Fill="{ThemeResource MandrillRubberBandFillBrush}"
+                Stroke="{ThemeResource MandrillRubberBandStrokeBrush}"
+                StrokeThickness="1"
+                Visibility="Collapsed" />
+        </Canvas>
+
+        <!--
+            Inline rename editor, placed over the name cell (no background: the rest of the list stays clickable). No Width:
+            like Explorer's it fits the name plus some slack and grows while typing, up to MaxWidth (set in PlaceRenameBox).
+        -->
+        <Canvas x:Name="EditCanvas" Grid.Row="1">
+            <TextBox
+                x:Name="RenameBox"
+                MinHeight="26"
+                Padding="4,2,12,2"
+                FontFamily="{ThemeResource MandrillListFontFamily}"
+                FontSize="{ThemeResource MandrillListFontSize}"
+                AutomationProperties.Name="{m:Tr Key=pane.rename}"
+                Visibility="Collapsed">
+                <!--
+                    Dark's focused fill (ControlFillColorInputActive) is 70 % opaque, so the old name and the columns the box
+                    grows over show through; Light's is already opaque. Merged, and tracked by AppTheme, so the app's High
+                    contrast palette still wins here.
+                -->
+                <TextBox.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary>
+                                <!--  Light and HighContrast repeat WinUI's own values so only Dark changes.  -->
+                                <ResourceDictionary.ThemeDictionaries>
+                                    <ResourceDictionary x:Key="Light">
+                                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="ControlFillColorInputActiveBrush" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="Default">
+                                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="SolidBackgroundFillColorBaseBrush" />
+                                    </ResourceDictionary>
+                                    <ResourceDictionary x:Key="HighContrast">
+                                        <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="SystemControlBackgroundAltHighBrush" />
+                                    </ResourceDictionary>
+                                </ResourceDictionary.ThemeDictionaries>
+                            </ResourceDictionary>
+                        </ResourceDictionary.MergedDictionaries>
+                    </ResourceDictionary>
+                </TextBox.Resources>
+            </TextBox>
+        </Canvas>
+
+        <StackPanel
+            x:Name="MessagePanel"
+            Grid.Row="1"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="4"
+            Visibility="Collapsed">
+            <TextBlock
+                x:Name="MessageText"
+                HorizontalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextAlignment="Center"
+                TextWrapping="Wrap" />
+            <HyperlinkButton
+                x:Name="RetryLink"
+                HorizontalAlignment="Center"
+                Content="{m:Tr Key=pane.retry}"
+                Visibility="Collapsed" />
+        </StackPanel>
+
+        <!--  Theme-aware sources of the selection brushes, inactive pane and active (read in code; never shown).  -->
+        <Border
+            x:Name="InactiveSelectionSwatch"
+            Background="{ThemeResource MandrillInactiveSelectionBrush}"
+            Visibility="Collapsed" />
+        <Border
+            x:Name="ListSelectedSwatch"
+            Background="{ThemeResource ListViewItemBackgroundSelected}"
+            Visibility="Collapsed" />
+        <Border
+            x:Name="ListSelectedHoverSwatch"
+            Background="{ThemeResource ListViewItemBackgroundSelectedPointerOver}"
+            Visibility="Collapsed" />
+        <Border
+            x:Name="GridSelectedSwatch"
+            Background="{ThemeResource GridViewItemBackgroundSelected}"
+            Visibility="Collapsed" />
+        <Border
+            x:Name="GridSelectedHoverSwatch"
+            Background="{ThemeResource GridViewItemBackgroundSelectedPointerOver}"
+            Visibility="Collapsed" />
+
+        <ProgressBar
+            x:Name="Progress"
+            Grid.RowSpan="2"
+            VerticalAlignment="Top"
+            IsIndeterminate="True"
+            Visibility="Collapsed" />
+    </Grid>
+</UserControl>

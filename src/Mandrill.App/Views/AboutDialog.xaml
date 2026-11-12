@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--  About (menu Help → About Mandrill): version, license, third-party components, log folder.  -->
+<ContentDialog
+    x:Class="Mandrill.App.Views.AboutDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    CloseButtonText="{m:Tr Key=dialog.about.close}"
+    DefaultButton="Close"
+    SecondaryButtonText="{m:Tr Key=dialog.about.openLogs}"
+    Title="{m:Tr Key=dialog.about.title}">
+    <StackPanel MinWidth="360" Spacing="10">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <Image
+                x:Name="AppIcon"
+                Width="48"
+                Height="48" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="{m:Tr Key=app.title}" />
+                <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </StackPanel>
+        <TextBlock Text="{m:Tr Key=dialog.about.license}" TextWrapping="Wrap" />
+        <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{m:Tr Key=dialog.about.thirdParty}" />
+        <TextBlock
+            x:Name="ThirdPartyText"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            IsTextSelectionEnabled="True"
+            TextWrapping="Wrap" />
+    </StackPanel>
+</ContentDialog>

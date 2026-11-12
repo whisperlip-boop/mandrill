@@ -1,0 +1,2 @@
+P:Microsoft.UI.Xaml.Controls.ListViewBase.SelectedItems;Reads every item at 100k rows; use the SelectionModel via PaneListAdapter (spike S2)
+P:Microsoft.UI.Xaml.Controls.ListViewBase.SelectedRanges;Use the SelectionModel via PaneListAdapter (spike S2)

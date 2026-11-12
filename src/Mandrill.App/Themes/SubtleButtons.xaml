@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Lightweight styling for toolbar buttons (owner F13): merged into a toolbar container's Resources, it gives the Buttons
+    and DropDownButtons inside the Fluent "subtle" look: transparent at rest, SubtleFillColorSecondary on hover,
+    SubtleFillColorTertiary when pressed, no border. The default hover fill (ControlFillColorSecondary) is meant for
+    filled, bordered buttons and is all but invisible on a transparent one. Theme resources only (AC-1.39, ADR-0014).
+    Dark uses the list fills instead (20 % white on hover, 10 % pressed): the subtle 6 % / 4 % fills were barely visible
+    there (owner round 6 #4); the hover then matches the file rows' hover strength. The menu bar does the same in Brushes.xaml.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <StaticResource x:Key="ButtonBackground" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+            <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+            <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="ButtonBorderBrush" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBorderBrushPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBorderBrushPressed" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="SubtleFillColorTransparentBrush" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+            <StaticResource x:Key="ButtonBackground" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="SystemControlBackgroundListMediumBrush" />
+            <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="SystemControlBackgroundListLowBrush" />
+            <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="ButtonBorderBrush" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBorderBrushPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBorderBrushPressed" ResourceKey="SubtleFillColorTransparentBrush" />
+            <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="SubtleFillColorTransparentBrush" />
+        </ResourceDictionary>
+        <!--  High contrast: the system highlight pair, so hover and press stay visible.  -->
+        <ResourceDictionary x:Key="HighContrast">
+            <StaticResource x:Key="ButtonBackground" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="SystemColorHighlightColorBrush" />
+            <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="SystemColorHighlightColorBrush" />
+            <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="ButtonForegroundPointerOver" ResourceKey="SystemColorHighlightTextColorBrush" />
+            <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="SystemColorHighlightTextColorBrush" />
+            <StaticResource x:Key="ButtonBorderBrush" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="ButtonBorderBrushPointerOver" ResourceKey="SystemColorHighlightTextColorBrush" />
+            <StaticResource x:Key="ButtonBorderBrushPressed" ResourceKey="SystemColorHighlightTextColorBrush" />
+            <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="SystemColorWindowColorBrush" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>
