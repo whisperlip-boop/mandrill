@@ -86,7 +86,6 @@ public sealed partial class App : Application
             _services = services;
             PerfLog.Mark("services created");
 
-            ApplyLanguageOverride(boot.Localizer.Language); // before any XAML element exists
             var icons = new Icons.IconProvider(boot.LoggerFactory.CreateLogger<Icons.IconProvider>());
             var viewModel = new MainViewModel(boot.LoggerFactory.CreateLogger<MainViewModel>()) { ShowHidden = hidden.ShowHidden };
             AppTheme.SetPalette(settings.Current.Theme); // before any view is built, so none needs a refresh
@@ -479,26 +478,6 @@ public sealed partial class App : Application
         if (e.IsTerminating)
         {
             FlushLog();
-        }
-    }
-
-    // m5: XAML picks its CJK fallback fonts (and built-in control strings) by the app language; without this they follow
-    // Windows, so ja/zh text on a Korean Windows mixed Korean glyphs in. A failure keeps the Windows language.
-    private void ApplyLanguageOverride(string code)
-    {
-        if (LanguageCatalog.Find(code) is not { } language)
-        {
-            return;
-        }
-
-        try
-        {
-            Microsoft.Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = language.Tag;
-            _log.LogInformation("UI framework language set to {Tag}", language.Tag);
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Setting the UI framework language to {Tag} failed; Windows' language stays", language.Tag);
         }
     }
 
