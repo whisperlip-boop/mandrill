@@ -55,6 +55,7 @@ public sealed partial class PaneTabStrip : UserControl
     private Press? _press;
     private double _offset;
     private bool _menuFilled;
+    private bool _menuFromRow;
     private bool _isPaneActive = true;
     private double _reservedRight;
 
@@ -63,9 +64,8 @@ public sealed partial class PaneTabStrip : UserControl
     {
         InitializeComponent();
         AppTheme.Track(Resources); // SubtleButtons.xaml scope ("+", chevrons)
-        _left = Chevron("", "pane.tab.scrollLeft", -1);
-        _right = Chevron("", "pane.tab.scrollRight", 1);
-        _more.Child = IconProvider.CreateGlyph(IconProvider.MoreGlyph, 12);
+        _left = Chevron("pane.tab.scrollLeft", -1);
+        _right = Chevron("pane.tab.scrollRight", 1);
         ToolTipService.SetToolTip(_more, Localizer.Current["pane.tab.hidden"]);
         AutomationProperties.SetAccessibilityView(_more, AccessibilityView.Raw);
 
@@ -80,10 +80,11 @@ public sealed partial class PaneTabStrip : UserControl
         RowCanvas.Children.Add(_plusHost);
         _plus.Click += OnPlusClick;
         _menu.Opening += OnMenuOpening;
+        _menu.Closed += (_, _) => RefocusAfterMenu();
         _edgeScroll = DispatcherQueue.CreateTimer();
         _edgeScroll.Interval = TimeSpan.FromMilliseconds(16);
         _edgeScroll.Tick += (_, _) => EdgeScrollTick();
-        SizeChanged += (_, _) => Arrange();
+        SizeChanged += (_, _) => ArrangeTabs();
         ActualThemeChanged += (_, _) => RefreshAll();
     }
 
@@ -111,7 +112,7 @@ public sealed partial class PaneTabStrip : UserControl
         set
         {
             _reservedRight = value;
-            Arrange();
+            ArrangeTabs();
         }
     }
 
@@ -148,7 +149,10 @@ public sealed partial class PaneTabStrip : UserControl
 
     internal int Count => _items.Count;
 
-    /// <summary>Binds the strip to its pane.</summary>
+    /// <summary>
+    /// Binds the strip to its pane for the pane's lifetime: it never unsubscribes, which holds while each pane has exactly one
+    /// view (App builds one per pane and keeps it). A view rebuilt for a live pane would need a Detach.
+    /// </summary>
     /// <param name="vm">The pane.</param>
     /// <param name="icons">Icon provider for "+" and the x.</param>
     /// <exception cref="InvalidOperationException">Already attached.</exception>
@@ -162,6 +166,9 @@ public sealed partial class PaneTabStrip : UserControl
         _vm = vm ?? throw new ArgumentNullException(nameof(vm));
         _icons = icons ?? throw new ArgumentNullException(nameof(icons));
         _plus.Content = icons.CreateElement(IconId.Add, size: 12);
+        _left.Content = icons.CreateElement(IconId.TabLeft, size: 10);
+        _right.Content = icons.CreateElement(IconId.TabRight, size: 10);
+        _more.Child = icons.CreateElement(IconId.Ellipsis, size: 12);
         vm.Tabs.CollectionChanged += OnTabsChanged;
         vm.PropertyChanged += OnPaneChanged;
         Sync();
@@ -374,7 +381,7 @@ public sealed partial class PaneTabStrip : UserControl
         target.X = x;
     }
 
-    private Button Chevron(string glyph, string key, int direction)
+    private Button Chevron(string key, int direction)
     {
         var button = new Button
         {
@@ -383,7 +390,6 @@ public sealed partial class PaneTabStrip : UserControl
             Padding = new Thickness(0),
             Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             BorderThickness = new Thickness(0),
-            Content = IconProvider.CreateGlyph(glyph, 10),
             Visibility = Visibility.Collapsed,
         };
         ToolTipService.SetToolTip(button, Localizer.Current[key]);
@@ -400,7 +406,7 @@ public sealed partial class PaneTabStrip : UserControl
         {
             case nameof(PaneViewModel.ActiveTab):
                 SetRoving(ActiveItem);
-                Arrange();
+                ArrangeTabs();
                 RefreshAll();
                 RaiseSelected(ActiveItem, _active);
                 _active = ActiveItem;
@@ -455,10 +461,20 @@ public sealed partial class PaneTabStrip : UserControl
             _items.Add(item);
         }
 
+        // UIA and Tab order walk the children: keep them in strip order after Duplicate and moves (review T3 m1).
+        for (int i = 0; i < _items.Count; i++)
+        {
+            int at = _track.Children.IndexOf(_items[i]);
+            if (at != i)
+            {
+                _track.Children.Move((uint)at, (uint)i);
+            }
+        }
+
         SetRoving(_roving is not null && _byTab.ContainsKey(_roving.Tab) ? _roving : ActiveItem);
         _active = ActiveItem;
         ApplyCanAdd();
-        Arrange();
+        ArrangeTabs();
         RefreshAll();
         if (focusInRow && !HasFocusWithin())
         {
@@ -468,7 +484,7 @@ public sealed partial class PaneTabStrip : UserControl
     }
 
     // ui-spec §2a width sharing. A is measured without the chevrons, so entering and leaving overflow never flickers.
-    private void Arrange()
+    private void ArrangeTabs()
     {
         int n = _items.Count;
         double available = ActualWidth - RowCanvas.Margin.Left - _reservedRight - TabStripLayout.PlusSlot;
@@ -550,7 +566,7 @@ public sealed partial class PaneTabStrip : UserControl
         _edgeScroll.Stop();
         press.Item.IsDragging = false;
         press.Item.ReleasePointerCaptures();
-        Arrange(); // z-order back
+        ArrangeTabs(); // z-order back
         press.Item.Refresh();
     }
 
@@ -676,7 +692,8 @@ public sealed partial class PaneTabStrip : UserControl
         _ = _vm.NewTabAsync();
         if (keyboard)
         {
-            ActiveItem?.Focus(FocusState.Keyboard); // the 10th tab disables "+": focus moves to the new tab, not away
+            // The 10th tab disables "+": focus moves to the new tab, once it is in the tree and loaded (review T3 m3).
+            DispatcherQueue.TryEnqueue(() => _ = ActiveItem is { } item && FocusTab(item));
         }
         else
         {
@@ -692,6 +709,7 @@ public sealed partial class PaneTabStrip : UserControl
             return;
         }
 
+        _menuFromRow = HasFocusWithin(); // before the menu takes the focus: a right-click from the list leaves it there
         if (!_menuFilled)
         {
             _menuFilled = true;
@@ -741,10 +759,31 @@ public sealed partial class PaneTabStrip : UserControl
                 break;
             case "close":
                 _vm.CloseTab(target.Tab);
+                RefocusAfterMenu();
                 break;
             case "closeOthers":
                 _vm.CloseOtherTabs(target.Tab);
+                RefocusAfterMenu();
                 break;
+        }
+    }
+
+    // After Close tab / Close other tabs from a menu opened in the row, the focus stays in the row on the newly active tab
+    // (ui-spec §2a). Low priority: after the flyout has handed the focus back to its (possibly closed) target. Called on the
+    // click and on Closed, whichever WinUI raises last.
+    private void RefocusAfterMenu()
+    {
+        if (_menuFromRow)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                // WinUI hands the focus of a closed target to another button of the row (measured), not to a tab.
+                bool onTab = XamlRoot is { } root && FocusManager.GetFocusedElement(root) is PaneTabItem focused && _items.Contains(focused);
+                if (!_menu.IsOpen && ActiveItem is { } item && !onTab)
+                {
+                    FocusTab(item);
+                }
+            });
         }
     }
 

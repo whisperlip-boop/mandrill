@@ -100,6 +100,15 @@ public enum IconId
 
     /// <summary>Close (a pane tab's x).</summary>
     Close,
+
+    /// <summary>Scroll the pane tabs left (owner icon).</summary>
+    TabLeft,
+
+    /// <summary>Scroll the pane tabs right (owner icon).</summary>
+    TabRight,
+
+    /// <summary>Some pane tabs are hidden (owner icon).</summary>
+    Ellipsis,
 }
 
 /// <summary>
@@ -152,6 +161,9 @@ public sealed class IconProvider(ILogger? logger = null)
         IconId.ViewList => "windows.iconsize.list",
         IconId.ViewDetails => "windows.iconsize.details",
         IconId.Close => "windows.close",
+        IconId.TabLeft => "tab-left",
+        IconId.TabRight => "tab-right",
+        IconId.Ellipsis => "Ellipsis",
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, null),
     };
 

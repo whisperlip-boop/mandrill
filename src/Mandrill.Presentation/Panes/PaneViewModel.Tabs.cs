@@ -29,7 +29,8 @@ public sealed partial class PaneViewModel
     public Task<NavigationResult> ActivateTabAsync(PaneTab tab)
     {
         ArgumentNullException.ThrowIfNull(tab);
-        if (tab == ActiveTab)
+        // A blank pane (a failed path superseded this tab's load) re-opens the tab's own location (review T2 m4).
+        if (tab == ActiveTab && (CurrentPath is not null || IsThisPc || IsLoading))
         {
             return Task.FromResult(new NavigationResult(NavigationOutcome.Committed, tab.Location));
         }
@@ -171,9 +172,13 @@ public sealed partial class PaneViewModel
 
     private void SetActiveTab(PaneTab tab)
     {
-        ActiveTab.IsActive = false;
-        tab.IsActive = true;
-        ActiveTab = tab;
+        if (tab != ActiveTab)
+        {
+            ActiveTab.IsActive = false;
+            tab.IsActive = true;
+            ActiveTab = tab;
+        }
+
         NotifyHistory();
     }
 
