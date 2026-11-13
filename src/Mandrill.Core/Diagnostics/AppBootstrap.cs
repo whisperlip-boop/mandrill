@@ -40,6 +40,12 @@ public sealed class BootstrapResult
 
     /// <summary>False when the data directory could not be created; there is no log file and nothing can be saved.</summary>
     public bool FileLoggingEnabled { get; }
+
+    /// <summary>The supported languages whose locale file is installed (the language picker's list).</summary>
+    public IReadOnlyList<LanguageInfo> Languages { get; init; } = [];
+
+    /// <summary>The language "auto" resolves to on this PC (the picker's Auto cell).</summary>
+    public string AutoLanguage { get; init; } = Localizer.English;
 }
 
 /// <summary>Settings and session loaded at startup (AC-1.33, AC-1.34), with the stores that save them later.</summary>
@@ -100,8 +106,12 @@ public static class AppBootstrap
             log.LogError(ex, "Loading settings, session or favorites failed; using defaults");
         }
 
-        var localizer = LoadLocalizer(paths, factory, log, UiLanguage.EffectiveSetting(settings.Language));
-        return new BootstrapResult(paths, factory, localizer, fileLogging, new StartupState(settings, session, firstRun, settingsStore, sessionStore, favorites, favoritesStore));
+        var (localizer, languages, auto) = LoadLocalizer(paths, factory, log, UiLanguage.EffectiveSetting(settings.Language));
+        return new BootstrapResult(paths, factory, localizer, fileLogging, new StartupState(settings, session, firstRun, settingsStore, sessionStore, favorites, favoritesStore))
+        {
+            Languages = languages,
+            AutoLanguage = auto,
+        };
     }
 
     private static (ILoggerFactory Factory, bool FileLogging, ILogger Log) StartLogging(AppPaths paths)
@@ -140,13 +150,16 @@ public static class AppBootstrap
         return (factory, fileLogging, log);
     }
 
-    private static Localizer LoadLocalizer(AppPaths paths, ILoggerFactory factory, ILogger log, string setting)
+    private static (Localizer Localizer, LanguageInfo[] Languages, string AutoLanguage) LoadLocalizer(AppPaths paths, ILoggerFactory factory, ILogger log, string setting)
     {
-        ushort langId = UiLanguage.UserDefaultLanguageId();
-        string language = Localizer.ResolveLanguage(setting, langId);
-        log.LogInformation("Language setting {Setting}, OS UI LANGID 0x{LangId:X4} -> {Language}", setting, langId, language);
+        string culture = UiLanguage.UserDefaultCultureName();
+        bool HasLocale(string code) => code == Localizer.English || File.Exists(Path.Combine(paths.LocalesDirectory, code + ".json"));
+        var languages = LanguageCatalog.All.Where(l => HasLocale(l.Code)).ToArray();
+        string language = Localizer.ResolveLanguage(setting, culture, HasLocale);
+        string auto = Localizer.ResolveLanguage(LanguageCatalog.Auto, culture, HasLocale);
+        log.LogInformation("Language setting {Setting}, OS UI culture {Culture} -> {Language} (auto {Auto}; available {Available})", setting, culture, language, auto, string.Join(",", languages.Select(l => l.Code)));
         var localizer = Localizer.Load(paths.LocalesDirectory, language, factory.CreateLogger(typeof(Localizer).FullName!));
         Localizer.SetCurrent(localizer);
-        return localizer;
+        return (localizer, languages, auto);
     }
 }

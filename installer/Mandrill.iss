@@ -11,6 +11,8 @@
 AppId={{B57DF464-34D8-4499-B9B6-AC2EEA67431A}
 AppName=Mandrill
 AppVersion={#AppVersion}
+; Plain name in Windows Apps (the default adds a localized "version x.y.z").
+UninstallDisplayName=Mandrill
 AppPublisher=bskim
 AppPublisherURL=https://github.com/whisperlip-boop/mandrill
 DefaultDirName={localappdata}\Programs\Mandrill

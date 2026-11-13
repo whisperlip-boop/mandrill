@@ -46,6 +46,7 @@ public sealed partial class App : Application
     private PaneContextMenus? _contextMenus;
     private Action<IndexStatus>? _indexStatusHandler;
     private bool _windowClosed;
+    private bool _restartOnClose;
 
     /// <summary>Initializes the application and the global error handlers.</summary>
     public App()
@@ -99,7 +100,12 @@ public sealed partial class App : Application
             _log.LogInformation("List font: {Face} {Size} px", font?.Face ?? "Segoe UI (fallback)", font?.Size ?? 12);
             _window = new MainWindow(viewModel, icons, boot.Paths, boot.LoggerFactory.CreateLogger<MainWindow>());
             AppTheme.Apply(_window, AppTheme.Parse(settings.Current.Theme)); // owner round 5 #5: before the first frame
-            _dialogs = new DialogLauncher(_window, viewModel, settings, services.Context.ShellLauncher, new UpdateChecker(boot.LoggerFactory), boot.Paths, icons, _window.ShowStatus, boot.LoggerFactory.CreateLogger<DialogLauncher>());
+            var languages = new LanguageSetup(boot.Languages, boot.AutoLanguage, () =>
+            {
+                _restartOnClose = true; // OnWindowClosed starts the new instance once the session and index are saved
+                viewModel.ExitCommand.Execute(null);
+            });
+            _dialogs = new DialogLauncher(_window, viewModel, settings, services.Context.ShellLauncher, new UpdateChecker(boot.LoggerFactory), boot.Paths, icons, _window.ShowStatus, languages, boot.LoggerFactory.CreateLogger<DialogLauncher>());
             PerfLog.Mark("main window created");
 
             // WP-1.10: 4 panes, re-parented by the layout. WP-1.17: a pane's view and tree are built the first time the pane
@@ -427,6 +433,11 @@ public sealed partial class App : Application
         catch (Exception ex)
         {
             _log.LogError(ex, "Shutting down services failed");
+        }
+
+        if (_restartOnClose)
+        {
+            AppRestart.StartNewInstance(_log); // logs a failure; nothing is left on screen to report it in
         }
 
         FlushLog();

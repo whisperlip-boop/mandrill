@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!--  Settings (AC-1.34, AC-1.3b, AC-2.10): language, theme, favorites bar, default arrangements for 2 and 3 panes, index.  -->
+<!--  Settings (AC-1.34, AC-1.3b, AC-2.10): theme, favorites bar, default arrangements for 2 and 3 panes, index.  -->
 <ContentDialog
     x:Class="Mandrill.App.Views.SettingsDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -15,14 +15,6 @@
     -->
     <ScrollViewer Margin="0,0,-24,0" VerticalScrollBarVisibility="Auto">
         <StackPanel MinWidth="380" Margin="0,0,24,0" Spacing="16">
-            <StackPanel Spacing="4">
-                <RadioButtons x:Name="LanguageChoice" Header="{m:Tr Key=dialog.settings.language}" />
-                <TextBlock
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Style="{ThemeResource CaptionTextBlockStyle}"
-                    Text="{m:Tr Key=dialog.settings.language.restart}"
-                    TextWrapping="Wrap" />
-            </StackPanel>
             <StackPanel Spacing="4">
                 <RadioButtons x:Name="ThemeChoice" Header="{m:Tr Key=dialog.settings.theme}" />
                 <TextBlock

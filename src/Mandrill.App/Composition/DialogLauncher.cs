@@ -12,13 +12,15 @@ using Mandrill.Presentation.Settings;
 using Mandrill.Presentation.Shell;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Mandrill.App.Composition;
 
 /// <summary>
-/// Opens the Settings and About dialogs when the menu asks (MainViewModel.SettingsRequested/AboutRequested), so the window
-/// itself needs no dialog code. One dialog at a time (ContentDialog rule). UI thread.
+/// Opens the Settings, language picker and About dialogs when the menu asks (MainViewModel.SettingsRequested,
+/// LanguageRequested, AboutRequested), so the window itself needs no dialog code. One dialog at a time (ContentDialog rule).
+/// UI thread.
 /// </summary>
 public sealed class DialogLauncher
 {
@@ -30,6 +32,7 @@ public sealed class DialogLauncher
     private readonly AppPaths _paths;
     private readonly IconProvider _icons;
     private readonly Action<string> _showStatus;
+    private readonly LanguageSetup _languages;
     private readonly ILogger _logger;
     private bool _open;
 
@@ -42,8 +45,9 @@ public sealed class DialogLauncher
     /// <param name="paths">Application paths (log folder).</param>
     /// <param name="icons">Icon provider (layout glyphs).</param>
     /// <param name="showStatus">Status-bar message (non-modal errors, ui-spec §7).</param>
+    /// <param name="languages">The language picker's languages and the "Restart now" action.</param>
     /// <param name="logger">Logger.</param>
-    public DialogLauncher(Window window, MainViewModel main, SettingsService settings, IShellLauncher launcher, UpdateChecker updates, AppPaths paths, IconProvider icons, Action<string> showStatus, ILogger<DialogLauncher> logger)
+    public DialogLauncher(Window window, MainViewModel main, SettingsService settings, IShellLauncher launcher, UpdateChecker updates, AppPaths paths, IconProvider icons, Action<string> showStatus, LanguageSetup languages, ILogger<DialogLauncher> logger)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _main = main ?? throw new ArgumentNullException(nameof(main));
@@ -53,9 +57,63 @@ public sealed class DialogLauncher
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _icons = icons ?? throw new ArgumentNullException(nameof(icons));
         _showStatus = showStatus ?? throw new ArgumentNullException(nameof(showStatus));
+        _languages = languages ?? throw new ArgumentNullException(nameof(languages));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         main.SettingsRequested += (_, _) => _ = ShowSettingsAsync();
+        main.LanguageRequested += (_, _) => _ = ShowLanguageAsync();
         main.AboutRequested += (_, _) => _ = ShowAboutAsync();
+    }
+
+    // L1: a new choice is saved at once and applies after a restart; "Restart now" goes through the normal exit (session saved).
+    private async Task ShowLanguageAsync()
+    {
+        if (_open || _window.Content?.XamlRoot is not { } root)
+        {
+            return;
+        }
+
+        _open = true;
+        try
+        {
+            var picker = new LanguageDialog(_languages.Languages, _languages.AutoLanguage, _settings.Current.Language, _icons) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
+            await picker.ShowAsync();
+            if (picker.Chosen is not { IsCurrent: false } chosen)
+            {
+                return;
+            }
+
+            if (!await _settings.SaveAsync(_settings.Current with { Language = chosen.Code }, CancellationToken.None))
+            {
+                _showStatus(Localizer.Current["dialog.settings.error.save"]);
+                return;
+            }
+
+            string message = Localizer.Current["dialog.language.restart.message"];
+            var prompt = new ContentDialog
+            {
+                Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
+                PrimaryButtonText = Localizer.Current["dialog.language.restart.now"],
+                CloseButtonText = Localizer.Current["dialog.language.restart.later"],
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = root,
+                RequestedTheme = AppTheme.Of(root),
+            };
+            AutomationProperties.SetName(prompt, message);
+            if (await prompt.ShowAsync() == ContentDialogResult.Primary)
+            {
+                _logger.LogInformation("Language {Language}: restart requested", chosen.Code);
+                _languages.Restart();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Language picker failed");
+            _showStatus(Localizer.Current["error.unexpected"]);
+        }
+        finally
+        {
+            _open = false;
+        }
     }
 
     private async Task ShowSettingsAsync()
@@ -165,3 +223,9 @@ public sealed class DialogLauncher
         }
     }
 }
+
+/// <summary>What the language picker needs from startup (L1).</summary>
+/// <param name="Languages">Installed languages (<c>BootstrapResult.Languages</c>).</param>
+/// <param name="AutoLanguage">The code "auto" resolves to (<c>BootstrapResult.AutoLanguage</c>).</param>
+/// <param name="Restart">Closes the app the normal way (session saved), then starts it again.</param>
+public sealed record LanguageSetup(IReadOnlyList<LanguageInfo> Languages, string AutoLanguage, Action Restart);

@@ -1,10 +1,11 @@
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using Mandrill.Core.Localization;
 
 namespace Mandrill.Core.State;
 
 /// <summary>settings.json (architecture §10): preferences edited in the Settings dialog.</summary>
-/// <param name="Language">"auto", "ko" or "en" (AC-1.34).</param>
+/// <param name="Language">"auto" or a code from <see cref="LanguageCatalog.All"/> (AC-1.34, language picker).</param>
 /// <param name="ShowFavoritesBar">Whether the favorites bar is visible.</param>
 /// <param name="LayoutDefaults">Default arrangement for 2 and 3 panes (AC-1.3b).</param>
 /// <param name="Index">Index options (Phase 2; stored now so the schema does not change).</param>
@@ -14,12 +15,6 @@ public sealed record AppSettings(string Language, bool ShowFavoritesBar, LayoutD
 {
     /// <summary>Follow the Windows UI language.</summary>
     public const string LanguageAuto = "auto";
-
-    /// <summary>Korean.</summary>
-    public const string LanguageKorean = "ko";
-
-    /// <summary>English.</summary>
-    public const string LanguageEnglish = "en";
 
     /// <summary>Follow the Windows light/dark setting.</summary>
     public const string ThemeSystem = "system";
@@ -47,7 +42,7 @@ public sealed record AppSettings(string Language, bool ShowFavoritesBar, LayoutD
     public AppSettings Normalize(ICollection<string> fixes)
     {
         ArgumentNullException.ThrowIfNull(fixes);
-        string? language = Known(Language, LanguageAuto, LanguageKorean, LanguageEnglish);
+        string? language = Known(Language, [LanguageAuto, .. LanguageCatalog.All.Select(l => l.Code)]);
         string? theme = Known(Theme, ThemeSystem, ThemeLight, ThemeDark, ThemeHighContrast);
         return new AppSettings(
             Fixes.Check(fixes, "language", language ?? Language!, language is not null, LanguageAuto),

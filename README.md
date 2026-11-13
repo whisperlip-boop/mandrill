@@ -18,7 +18,8 @@ favorite, and find files by name across your local drives from Mandrill's own in
   with the standard Windows progress and conflict dialogs and undo, clipboard and drag and drop with File Explorer,
   and the usual keyboard shortcuts.
 - **Light, dark and high contrast**: follows the Windows theme, or pick light or dark in Settings.
-- **Korean and English UI**: follows the Windows display language, or pick one in Settings.
+- **UI languages**: English, Korean, Japanese, Chinese (Simplified) and Chinese (Traditional). Mandrill follows the
+  Windows display language, or pick one with **File → Language…** (applies after a restart).
 - **Private**: no telemetry and no administrator rights. The only network access is the manual "Check for updates"
   button in About, which asks GitHub for the latest release.
 

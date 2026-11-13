@@ -28,6 +28,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Raised when the user chose Settings…; the view opens the Settings dialog (WP-1.11).</summary>
     public event EventHandler? SettingsRequested;
 
+    /// <summary>Raised when the user chose Language…; the view opens the language picker (L1).</summary>
+    public event EventHandler? LanguageRequested;
+
     /// <summary>Raised when the user chose About; the view opens the About dialog (WP-1.11).</summary>
     public event EventHandler? AboutRequested;
 
@@ -71,6 +74,13 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _logger.LogInformation("Settings requested from the menu");
         SettingsRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void OpenLanguage()
+    {
+        _logger.LogInformation("Language picker requested from the menu");
+        LanguageRequested?.Invoke(this, EventArgs.Empty);
     }
 
     [RelayCommand]

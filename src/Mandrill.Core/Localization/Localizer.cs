@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Mandrill.Core.Localization;
 
 /// <summary>
-/// User-facing strings from flat dotted-key JSON (Locales\en.json, Locales\ko.json; ADR-0013).
+/// User-facing strings from flat dotted-key JSON (Locales\&lt;code&gt;.json; ADR-0013, docs/i18n.md).
 /// Lookup: chosen language → English → the key itself; each fallback is logged once per key.
 /// Lookups are thread-safe and do no I/O.
 /// </summary>
@@ -19,10 +19,6 @@ public sealed partial class Localizer
     /// <summary>English (always loaded as the fallback table).</summary>
     public const string English = "en";
 
-    /// <summary>Korean.</summary>
-    public const string Korean = "ko";
-
-    private const ushort LangKorean = 0x12;
     private readonly FrozenDictionary<string, string> _primary;
     private readonly FrozenDictionary<string, string> _english;
     private readonly ILogger _logger;
@@ -39,7 +35,7 @@ public sealed partial class Localizer
     /// <summary>The process-wide instance used by views (<c>{m:Tr}</c>). Until set, keys are returned as-is.</summary>
     public static Localizer Current { get; private set; } = FromTables(English, new Dictionary<string, string>(), new Dictionary<string, string>(), NullLogger.Instance);
 
-    /// <summary>Active language code ("ko" or "en").</summary>
+    /// <summary>Active language code (a code from <see cref="LanguageCatalog.All"/>).</summary>
     public string Language { get; }
 
     /// <summary>Looks up a string: language → English → key.</summary>
@@ -77,28 +73,24 @@ public sealed partial class Localizer
         Current = localizer;
     }
 
-    /// <summary>Resolves the language setting: "ko"/"en" as given; anything else ("auto") follows the OS UI language.</summary>
-    /// <param name="setting">"auto", "ko" or "en" (case-insensitive).</param>
-    /// <param name="uiLanguageId">OS UI LANGID (GetUserDefaultUILanguage).</param>
-    /// <returns>"ko" or "en".</returns>
-    public static string ResolveLanguage(string? setting, ushort uiLanguageId)
+    /// <summary>
+    /// Resolves the language setting: a supported code whose locale file exists is used as given; "auto", unknown codes and
+    /// codes without a file follow the Windows UI language (<see cref="LanguageCatalog.FromCultureName"/>), else English.
+    /// </summary>
+    /// <param name="setting">"auto" or a code from <see cref="LanguageCatalog.All"/> (case-insensitive).</param>
+    /// <param name="uiCultureName">Windows UI culture name, e.g. "ko-KR"; empty when unknown.</param>
+    /// <param name="hasLocale">Whether Locales\&lt;code&gt;.json exists.</param>
+    /// <returns>A code from <see cref="LanguageCatalog.All"/>.</returns>
+    public static string ResolveLanguage(string? setting, string? uiCultureName, Func<string, bool> hasLocale)
     {
-        if (string.Equals(setting, Korean, StringComparison.OrdinalIgnoreCase))
-        {
-            return Korean;
-        }
-
-        if (string.Equals(setting, English, StringComparison.OrdinalIgnoreCase))
-        {
-            return English;
-        }
-
-        return (uiLanguageId & 0x3FF) == LangKorean ? Korean : English;
+        ArgumentNullException.ThrowIfNull(hasLocale);
+        string code = LanguageCatalog.Find(setting) is { } chosen && hasLocale(chosen.Code) ? chosen.Code : LanguageCatalog.FromCultureName(uiCultureName);
+        return code == English || hasLocale(code) ? code : English;
     }
 
     /// <summary>Loads Locales\en.json and Locales\&lt;language&gt;.json. Worker thread only. Unreadable files are logged and treated as empty.</summary>
     /// <param name="localesDirectory">Directory containing the JSON files.</param>
-    /// <param name="language">"ko" or "en".</param>
+    /// <param name="language">A code from <see cref="LanguageCatalog.All"/>.</param>
     /// <param name="logger">Logger for load errors and missing keys.</param>
     /// <returns>The localizer.</returns>
     public static Localizer Load(string localesDirectory, string language, ILogger logger)

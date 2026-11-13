@@ -14,20 +14,13 @@ using VirtualKey = Windows.System.VirtualKey;
 namespace Mandrill.App.Views;
 
 /// <summary>
-/// Settings dialog (AC-1.34, AC-1.3b, ui-spec §1): language (applies after restart, the dialog says so), theme, favorites bar,
+/// Settings dialog (AC-1.34, AC-1.3b, ui-spec §1): theme (the language has its own picker, File → Language…), favorites bar,
 /// default arrangements for 2 and 3 panes shown with the layout glyphs, and the index section (AC-2.10, WP-2.6): excluded
 /// folders (typed path or folder picker, rejections as an inline message) and the rescan interval, edited through
 /// <see cref="ExcludeListEditor"/>. The caller saves <see cref="ToSettings"/> when the user chose Save.
 /// </summary>
 public sealed partial class SettingsDialog : ContentDialog
 {
-    private static readonly (string Value, string Key)[] Languages =
-    [
-        (AppSettings.LanguageAuto, "dialog.settings.language.auto"),
-        (AppSettings.LanguageKorean, "dialog.settings.language.ko"),
-        (AppSettings.LanguageEnglish, "dialog.settings.language.en"),
-    ];
-
     private static readonly (string Value, string Key)[] Themes =
     [
         (AppSettings.ThemeSystem, "dialog.settings.theme.system"),
@@ -59,7 +52,6 @@ public sealed partial class SettingsDialog : ContentDialog
         _index = index ?? throw new ArgumentNullException(nameof(index));
         _pickFolder = pickFolder ?? throw new ArgumentNullException(nameof(pickFolder));
         InitializeComponent();
-        Fill(LanguageChoice, Languages, current.Language);
         Fill(ThemeChoice, Themes, current.Theme);
         FavoritesBarToggle.IsOn = current.ShowFavoritesBar;
         Fill(TwoPaneChoice, TwoPaneLayouts, current.LayoutDefaults.TwoPanes, icons);
@@ -71,7 +63,6 @@ public sealed partial class SettingsDialog : ContentDialog
     /// <returns>The new settings.</returns>
     public AppSettings ToSettings() => _original with
     {
-        Language = Languages[Math.Clamp(LanguageChoice.SelectedIndex, 0, Languages.Length - 1)].Value,
         Theme = Themes[Math.Clamp(ThemeChoice.SelectedIndex, 0, Themes.Length - 1)].Value,
         ShowFavoritesBar = FavoritesBarToggle.IsOn,
         LayoutDefaults = new LayoutDefaults(

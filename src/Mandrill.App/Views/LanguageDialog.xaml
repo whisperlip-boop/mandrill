@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--  File → Language… (L1): Auto first, then the installed languages in three columns, filtered by the search box.  -->
+<ContentDialog
+    x:Class="Mandrill.App.Views.LanguageDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    xmlns:s="using:Mandrill.Presentation.Settings"
+    AutomationProperties.Name="{m:Tr Key=dialog.language.title}">
+    <!--  No footer buttons: the title row carries the x, as in the Windows language pickers.  -->
+    <Grid
+        Width="504"
+        PreviewKeyDown="OnPreviewKeyDown"
+        RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid x:Name="TitleRow" ColumnSpacing="8">
+            <Grid.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceDictionary Source="ms-appx:///Themes/SubtleButtons.xaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
+            </Grid.Resources>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                VerticalAlignment="Center"
+                Style="{ThemeResource SubtitleTextBlockStyle}"
+                Text="{m:Tr Key=dialog.language.title}"
+                TextTrimming="CharacterEllipsis" />
+            <Button
+                x:Name="CloseButton"
+                Grid.Column="1"
+                Width="32"
+                Height="32"
+                Padding="0"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="{m:Tr Key=dialog.language.close}"
+                Click="OnCloseClick"
+                ToolTipService.ToolTip="{m:Tr Key=dialog.language.close}" />
+        </Grid>
+        <TextBox
+            x:Name="SearchBox"
+            Grid.Row="1"
+            AutomationProperties.Name="{m:Tr Key=dialog.language.search}"
+            KeyDown="OnSearchKeyDown"
+            PlaceholderText="{m:Tr Key=dialog.language.search}"
+            TextChanged="OnSearchTextChanged" />
+        <!--  Selection = the saved setting (it does not follow focus); a click, Enter or Space picks the focused cell.  -->
+        <GridView
+            x:Name="LanguageGrid"
+            Grid.Row="2"
+            MaxHeight="400"
+            AutomationProperties.Name="{m:Tr Key=dialog.language.list}"
+            ContainerContentChanging="OnContainerContentChanging"
+            IsItemClickEnabled="True"
+            ItemClick="OnItemClick"
+            SelectionChanged="OnSelectionChanged"
+            SelectionMode="Single"
+            SingleSelectionFollowsFocus="False">
+            <GridView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <ItemsWrapGrid
+                        ItemWidth="166"
+                        MaximumRowsOrColumns="3"
+                        Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </GridView.ItemsPanel>
+            <GridView.ItemContainerStyle>
+                <Style BasedOn="{StaticResource DefaultGridViewItemStyle}" TargetType="GridViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </GridView.ItemContainerStyle>
+            <GridView.ItemTemplate>
+                <DataTemplate x:DataType="s:LanguageChoice">
+                    <Grid Padding="8,6" ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock
+                                Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                Text="{x:Bind Name}"
+                                TextTrimming="CharacterEllipsis" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{ThemeResource CaptionTextBlockStyle}"
+                                Text="{x:Bind Detail}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <FontIcon
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="14"
+                            Glyph="&#xE73E;"
+                            Visibility="{x:Bind IsCurrent}" />
+                    </Grid>
+                </DataTemplate>
+            </GridView.ItemTemplate>
+        </GridView>
+    </Grid>
+</ContentDialog>
