@@ -29,6 +29,7 @@
         <Canvas x:Name="RowCanvas" Margin="4,0,0,0" />
         <Border x:Name="RowBackgroundSwatch" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed" />
         <Border x:Name="EdgeSwatch" Background="{ThemeResource MandrillTabEdgeBrush}" Visibility="Collapsed" />
+        <Border x:Name="ActivePaneSwatch" Background="{ThemeResource MandrillActivePaneBorderBrush}" Visibility="Collapsed" />
         <Border
             x:Name="HcSwatch"
             Background="{ThemeResource MandrillTabBackgroundBrush}"

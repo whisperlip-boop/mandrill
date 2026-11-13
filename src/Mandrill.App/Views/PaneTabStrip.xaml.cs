@@ -321,23 +321,23 @@ public sealed partial class PaneTabStrip : UserControl
     internal TabLook LookOf(PaneTabItem item)
     {
         bool active = item.Tab.IsActive;
+        bool highlighted = active && _isPaneActive;
         Brush focusOuter = FocusSwatch.Background;
         Brush focusInner = FocusSwatch.BorderBrush;
         if (AppTheme.IsHighContrast())
         {
-            bool highlighted = active && _isPaneActive;
             Brush fill = highlighted ? HcActiveSwatch.Background : HcSwatch.Background;
             Brush text = highlighted ? HcActiveSwatch.BorderBrush : HcSwatch.BorderBrush;
             return item.VisualState != TabVisualState.Rest || item.IsDragging
                 ? new TabLook(fill, text, HcHoverSwatch.Background, 2, focusOuter, focusInner) // HC pressed = HC hover
-                : new TabLook(fill, text, HcSwatch.BorderBrush, active && !_isPaneActive ? 2 : 1, focusOuter, focusInner);
+                : new TabLook(fill, text, highlighted ? ActivePaneSwatch.Background : HcSwatch.BorderBrush, active && !_isPaneActive ? 2 : 1, focusOuter, focusInner);
         }
 
         Color fillColor = TabPalette.Fill(item.Tab.Color, item.VisualState, _isPaneActive, RowBackground);
         return new TabLook(
             new SolidColorBrush(fillColor),
             new SolidColorBrush(TabPalette.Text(item.Tab.Color, fillColor, _isPaneActive)),
-            EdgeSwatch.Background,
+            highlighted ? ActivePaneSwatch.Background : EdgeSwatch.Background, // owner: the active pane's selected tab takes its frame colour
             item.IsDragging ? 2 : 1,
             focusOuter,
             focusInner);

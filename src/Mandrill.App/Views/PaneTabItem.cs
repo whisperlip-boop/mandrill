@@ -30,10 +30,11 @@ public sealed partial class PaneTabItem : ContentControl
     public const double Slant = 8;
 
     private const double Radius = 6;
-    // Text and x stay clear of the 16 px a neighbour overlaps (QA F4/F5): the left neighbour's slant covers up to x 16, the
-    // right neighbour's from W − 16 on, and the active tab must stay topmost there.
+    // Text stays clear of the 16 px a neighbour overlaps (QA F4/F5): the left neighbour's slant covers up to x 16, the
+    // right neighbour's from W − 16 on. The x glyph (W − 25…W − 15) sits by the right slant (owner) and still clears a
+    // topmost right neighbour, whose slant is at W − 14 at the glyph's bottom.
     private const double TextLeft = 2 * Slant + 4;
-    private const double CloseRight = 2 * Slant + 4;
+    private const double CloseRight = 10;
     private const double CloseReserve = CloseRight + 20 + 4;
     private const double NarrowReserve = 2 * Slant + 4;
     private const double NarrowWidth = 120;
@@ -41,6 +42,7 @@ public sealed partial class PaneTabItem : ContentControl
     private readonly PaneTabStrip _strip;
     private readonly Path _hit = new() { Fill = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
     private readonly Path _shape = new() { IsHitTestVisible = false };
+    private readonly Path _edge = new() { IsHitTestVisible = false };
     private readonly Path _ringOuter = new() { IsHitTestVisible = false, StrokeThickness = 2, Visibility = Visibility.Collapsed };
     private readonly Path _ringInner = new() { IsHitTestVisible = false, StrokeThickness = 1, Visibility = Visibility.Collapsed };
     private readonly TextBlock _text = new() { TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center };
@@ -90,9 +92,10 @@ public sealed partial class PaneTabItem : ContentControl
         root.Children.Add(_hit);
         root.Children.Add(_shape);
         root.Children.Add(_band);
+        root.Children.Add(_close);
+        root.Children.Add(_edge); // the outline and ring above the x: its 20 px background must not cover them
         root.Children.Add(_ringOuter);
         root.Children.Add(_ringInner);
-        root.Children.Add(_close);
         Content = root;
 
         PointerEntered += (_, _) => SetPointer(hover: true, _pressed);
@@ -119,6 +122,9 @@ public sealed partial class PaneTabItem : ContentControl
 
     /// <summary>The visible shape's top: 0 when active, 2 otherwise (tests).</summary>
     public double ShapeTop => _shapeTop;
+
+    /// <summary>The outline's brush (tests).</summary>
+    public Brush EdgeBrush => _edge.Stroke;
 
     internal TabVisualState VisualState => _pressed ? TabVisualState.Pressed : _hover ? TabVisualState.Hover : TabVisualState.Rest;
 
@@ -147,14 +153,15 @@ public sealed partial class PaneTabItem : ContentControl
             _shapeTop = top;
             _hit.Data = Trapezoid(width, 0, 0, Radius);
             _shape.Data = Trapezoid(width, top, 0, Radius);
+            _edge.Data = Trapezoid(width, top, 0, Radius);
             _ringOuter.Data = Trapezoid(width, top, 1, Radius);
             _ringInner.Data = Trapezoid(width, top, 2.5, Radius);
         }
 
         var look = _strip.LookOf(this);
         _shape.Fill = look.Fill;
-        _shape.Stroke = look.Edge;
-        _shape.StrokeThickness = look.EdgeThickness;
+        _edge.Stroke = look.Edge;
+        _edge.StrokeThickness = look.EdgeThickness;
         _text.Foreground = look.Text;
         _closeGlyph.Foreground = look.Text;
         _close.Foreground = look.Text;
