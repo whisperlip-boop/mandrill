@@ -180,7 +180,6 @@
   "dialog.about.openLogs": "Open log folder",
   "dialog.about.close": "Close",
   "dialog.about.update.check": "Check for updates",
-  "dialog.about.update.caption": "Mandrill connects to GitHub only when you press this button, to read the latest version number. It makes no other network connections.",
   "dialog.about.update.checking": "Checking…",
   "dialog.about.update.upToDate": "You have the latest version ({current}).",
   "dialog.about.update.available": "Update available: {current} → {latest}",

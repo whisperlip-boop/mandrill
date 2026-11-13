@@ -31,12 +31,6 @@
                 x:Name="UpdateReleaseLink"
                 Content="{m:Tr Key=dialog.about.update.openRelease}"
                 Visibility="Collapsed" />
-            <TextBlock
-                x:Name="UpdateCaption"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Style="{ThemeResource CaptionTextBlockStyle}"
-                Text="{m:Tr Key=dialog.about.update.caption}"
-                TextWrapping="Wrap" />
         </StackPanel>
         <TextBlock Text="{m:Tr Key=dialog.about.license}" TextWrapping="Wrap" />
         <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{m:Tr Key=dialog.about.thirdParty}" />
