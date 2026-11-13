@@ -13,9 +13,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PublishDocumentationFile>false</PublishDocumentationFile>
     <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
-    <Version>0.1.0</Version>
-    <InformationalVersion>0.1.0</InformationalVersion>
-    <!-- Keep the plain version; 1.0.0 is assigned by the owner at release. -->
+    <Version>1.0.0</Version>
+    <InformationalVersion>1.0.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Company>Mandrill</Company>
     <Product>Mandrill</Product>

@@ -71,7 +71,7 @@ public sealed partial class UpdateChecker
     public static Uri ReleasePage { get; } = new("https://github.com/whisperlip-boop/mandrill/releases/latest");
 
     /// <summary>Asks GitHub for the latest release and compares it with <paramref name="currentVersion"/>. Any thread.</summary>
-    /// <param name="currentVersion">This build's version (e.g. "0.1.0").</param>
+    /// <param name="currentVersion">This build's version (e.g. "1.0.0").</param>
     /// <param name="ct">Cancels the check (the dialog closed).</param>
     /// <returns>The outcome; never throws except <see cref="OperationCanceledException"/>.</returns>
     /// <exception cref="OperationCanceledException"><paramref name="ct"/> was cancelled.</exception>
