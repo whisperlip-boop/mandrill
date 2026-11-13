@@ -31,10 +31,10 @@ public sealed partial class PaneTabItem : ContentControl
 
     private const double Radius = 6;
     // Text stays clear of the 16 px a neighbour overlaps (QA F4/F5): the left neighbour's slant covers up to x 16, the
-    // right neighbour's from W − 16 on. The x glyph (W − 25…W − 15) sits by the right slant (owner) and still clears a
-    // topmost right neighbour, whose slant is at W − 14 at the glyph's bottom.
+    // right neighbour's from W − 16 on. The x glyph (W − 27…W − 17) sits by the right slant (owner) and keeps ≈ 2 px of fill
+    // before a topmost right neighbour's outline (slant W − 14.2 at the glyph's bottom, minus stroke and anti-aliasing; QA QF1).
     private const double TextLeft = 2 * Slant + 4;
-    private const double CloseRight = 10;
+    private const double CloseRight = 12;
     private const double CloseReserve = CloseRight + 20 + 4;
     private const double NarrowReserve = 2 * Slant + 4;
     private const double NarrowWidth = 120;
