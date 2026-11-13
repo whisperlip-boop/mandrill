@@ -8,6 +8,7 @@ using Mandrill.Core.Localization;
 using Mandrill.Core.Platform;
 using Mandrill.Core.Shell;
 using Mandrill.Core.State;
+using Mandrill.Core.Update;
 using Mandrill.Presentation.Common;
 using Mandrill.Presentation.Favorites;
 using Mandrill.Presentation.Layout;
@@ -98,7 +99,7 @@ public sealed partial class App : Application
             _log.LogInformation("List font: {Face} {Size} px", font?.Face ?? "Segoe UI (fallback)", font?.Size ?? 12);
             _window = new MainWindow(viewModel, icons, boot.Paths, boot.LoggerFactory.CreateLogger<MainWindow>());
             AppTheme.Apply(_window, AppTheme.Parse(settings.Current.Theme)); // owner round 5 #5: before the first frame
-            _dialogs = new DialogLauncher(_window, viewModel, settings, services.Context.ShellLauncher, boot.Paths, icons, _window.ShowStatus, boot.LoggerFactory.CreateLogger<DialogLauncher>());
+            _dialogs = new DialogLauncher(_window, viewModel, settings, services.Context.ShellLauncher, new UpdateChecker(boot.LoggerFactory), boot.Paths, icons, _window.ShowStatus, boot.LoggerFactory.CreateLogger<DialogLauncher>());
             PerfLog.Mark("main window created");
 
             // WP-1.10: 4 panes, re-parented by the layout. WP-1.17: a pane's view and tree are built the first time the pane

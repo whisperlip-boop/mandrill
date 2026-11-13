@@ -22,7 +22,7 @@
   </PropertyGroup>
   <!--
     Project flags (set in the project file, evaluated in Directory.Build.targets):
-    MandrillBannedApis = true  App, Presentation: no file system / shell / registry / Win32 (BannedSymbols.txt)
+    MandrillBannedApis = true  App, Presentation: no file system / shell / registry / Win32 / HttpClient (BannedSymbols.txt)
     MandrillNoUi       = true  Core, Presentation: no Microsoft.UI (BannedSymbols.NoUi.txt)
     MandrillUiProject  = true  App, App.Tests: the only projects allowed to reference Microsoft.WindowsAppSDK
   -->

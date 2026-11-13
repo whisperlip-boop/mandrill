@@ -16,3 +16,4 @@ T:Microsoft.Win32.RegistryKey;Registry access belongs in Mandrill.Core
 N:Windows.Win32;Win32 interop belongs in Mandrill.Core
 M:Windows.Storage.StorageFile.GetFileFromPathAsync(System.String);File system access belongs in Mandrill.Core
 M:Windows.Storage.StorageFolder.GetFolderFromPathAsync(System.String);File system access belongs in Mandrill.Core
+N:System.Net.Http;Network access belongs in Mandrill.Core (ADR-0016)

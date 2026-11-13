@@ -5,6 +5,8 @@ using Mandrill.Core.Diagnostics;
 using Mandrill.Core.Index;
 using Mandrill.Core.Localization;
 using Mandrill.Core.Shell;
+using Mandrill.Core.Update;
+using Mandrill.Presentation.About;
 using Mandrill.Presentation.Panes;
 using Mandrill.Presentation.Settings;
 using Mandrill.Presentation.Shell;
@@ -24,6 +26,7 @@ public sealed class DialogLauncher
     private readonly MainViewModel _main;
     private readonly SettingsService _settings;
     private readonly IShellLauncher _launcher;
+    private readonly UpdateChecker _updates;
     private readonly AppPaths _paths;
     private readonly IconProvider _icons;
     private readonly Action<string> _showStatus;
@@ -34,17 +37,19 @@ public sealed class DialogLauncher
     /// <param name="window">Main window (dialog XamlRoot).</param>
     /// <param name="main">Window view model.</param>
     /// <param name="settings">Settings in effect and their save.</param>
-    /// <param name="launcher">Shell launcher ("Open log folder").</param>
+    /// <param name="launcher">Shell launcher ("Open log folder", the release page).</param>
+    /// <param name="updates">The About dialog's update check.</param>
     /// <param name="paths">Application paths (log folder).</param>
     /// <param name="icons">Icon provider (layout glyphs).</param>
     /// <param name="showStatus">Status-bar message (non-modal errors, ui-spec §7).</param>
     /// <param name="logger">Logger.</param>
-    public DialogLauncher(Window window, MainViewModel main, SettingsService settings, IShellLauncher launcher, AppPaths paths, IconProvider icons, Action<string> showStatus, ILogger<DialogLauncher> logger)
+    public DialogLauncher(Window window, MainViewModel main, SettingsService settings, IShellLauncher launcher, UpdateChecker updates, AppPaths paths, IconProvider icons, Action<string> showStatus, ILogger<DialogLauncher> logger)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _main = main ?? throw new ArgumentNullException(nameof(main));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _launcher = launcher ?? throw new ArgumentNullException(nameof(launcher));
+        _updates = updates ?? throw new ArgumentNullException(nameof(updates));
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _icons = icons ?? throw new ArgumentNullException(nameof(icons));
         _showStatus = showStatus ?? throw new ArgumentNullException(nameof(showStatus));
@@ -125,8 +130,15 @@ public sealed class DialogLauncher
         _open = true;
         try
         {
-            var dialog = new AboutDialog(_paths.AppIcon) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
-            if (await dialog.ShowAsync() != ContentDialogResult.Secondary)
+            ContentDialogResult choice;
+            // Disposed when the dialog closes: cancels a running check and drops its late result.
+            using (var updates = new UpdateCheckViewModel(AboutDialog.Version, _updates.CheckAsync, ct => _launcher.OpenUrlAsync(UpdateChecker.ReleasePage, ct)))
+            {
+                var dialog = new AboutDialog(updates, _paths.AppIcon) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
+                choice = await dialog.ShowAsync();
+            }
+
+            if (choice != ContentDialogResult.Secondary)
             {
                 return;
             }

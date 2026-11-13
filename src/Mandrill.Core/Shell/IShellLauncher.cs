@@ -10,6 +10,13 @@ public interface IShellLauncher
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Launched, a folder to navigate to, or the failure.</returns>
     Task<OpenResult> OpenAsync(string path, CancellationToken ct);
+
+    /// <summary>Opens an absolute https URL in the default browser (ADR-0016). Failures are logged.</summary>
+    /// <param name="url">Absolute https URL.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when the shell started the browser.</returns>
+    /// <exception cref="ArgumentException"><paramref name="url"/> is relative or not https.</exception>
+    Task<bool> OpenUrlAsync(Uri url, CancellationToken ct);
 }
 
 /// <summary>What <see cref="IShellLauncher.OpenAsync"/> did.</summary>

@@ -69,6 +69,39 @@ public sealed class ShellLauncher : IShellLauncher
         return result.Outcome == OpenOutcome.Failed && result.Error is not null ? Fail(result.Error) : result;
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> OpenUrlAsync(Uri url, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(url);
+        if (!url.IsAbsoluteUri || url.Scheme != Uri.UriSchemeHttps || url.UserInfo.Length != 0)
+        {
+            throw new ArgumentException("Only an absolute https URL without user info can be opened.", nameof(url));
+        }
+
+        string text = url.AbsoluteUri;
+        OpenResult result;
+        try
+        {
+            result = await _sta.InvokeAsync(() => Execute(text, null, text), _timeout, ct).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            result = OpenResult.Failed(new FsError(FsErrorKind.Other, text, ErrorTimeout));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Open {Url} failed unexpectedly", text);
+            return false;
+        }
+
+        if (result.Error is not null)
+        {
+            Fail(result.Error);
+        }
+
+        return result.Outcome == OpenOutcome.Launched;
+    }
+
     /// <summary>Maps a ShellExecuteExW failure (GetLastError, or the SE_ERR_* value in hInstApp) to an error kind.</summary>
     /// <param name="win32Code">Last error; 0 when the shell set none.</param>
     /// <param name="seErr">SE_ERR_* from hInstApp (≤ 32), or 0.</param>
@@ -171,7 +204,7 @@ public sealed class ShellLauncher : IShellLauncher
             return OpenResult.Failed(new FsError(FsErrorKind.NoAssociation, path, ErrorNoAssociation));
         }
 
-        return Execute(shellPath, path);
+        return Execute(shellPath, Path.GetDirectoryName(shellPath), path);
     }
 
     // True when ShellExecute has a class for the type other than the "Unknown" fallback.
@@ -258,9 +291,9 @@ public sealed class ShellLauncher : IShellLauncher
         }
     }
 
-    private unsafe OpenResult Execute(string shellPath, string path)
+    // STA thread. directory: working folder, or null (a URL has none).
+    private unsafe OpenResult Execute(string shellPath, string? directory, string path)
     {
-        string? directory = Path.GetDirectoryName(shellPath);
         fixed (char* file = shellPath)
         fixed (char* dir = directory)
         {

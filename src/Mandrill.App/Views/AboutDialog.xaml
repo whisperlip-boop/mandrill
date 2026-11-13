@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!--  About (menu Help → About Mandrill): version, license, third-party components, log folder.  -->
+<!--  About (menu Help → About Mandrill): version, manual update check (ADR-0016), license, third-party components, log folder.  -->
 <ContentDialog
     x:Class="Mandrill.App.Views.AboutDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -19,6 +19,24 @@
                 <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="{m:Tr Key=app.title}" />
                 <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
+        </StackPanel>
+        <StackPanel Spacing="6">
+            <Button x:Name="UpdateCheckButton" Content="{m:Tr Key=dialog.about.update.check}" />
+            <!--  Kept Visible while empty so the live region exists before the first announcement.  -->
+            <TextBlock
+                x:Name="UpdateStatusText"
+                AutomationProperties.LiveSetting="Polite"
+                TextWrapping="Wrap" />
+            <HyperlinkButton
+                x:Name="UpdateReleaseLink"
+                Content="{m:Tr Key=dialog.about.update.openRelease}"
+                Visibility="Collapsed" />
+            <TextBlock
+                x:Name="UpdateCaption"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{ThemeResource CaptionTextBlockStyle}"
+                Text="{m:Tr Key=dialog.about.update.caption}"
+                TextWrapping="Wrap" />
         </StackPanel>
         <TextBlock Text="{m:Tr Key=dialog.about.license}" TextWrapping="Wrap" />
         <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{m:Tr Key=dialog.about.thirdParty}" />
