@@ -29,7 +29,8 @@
             <Thickness x:Key="MandrillItemFocusSecondaryThickness">0</Thickness>
             <x:Double x:Key="MandrillRowSecondaryOpacity">0.693</x:Double><!--  0x9E / 0xE4  -->
             <x:Double x:Key="MandrillRowTertiaryOpacity">0.5</x:Double><!--  0x72 / 0xE4  -->
-            <StaticResource x:Key="MandrillColumnDividerBrush" ResourceKey="SurfaceStrokeColorDefaultBrush" />
+            <!--  Header dividers (WP-2): Explorer draws #E5E5E5 on white; ListLow (10 % black; 10 % white in Dark) is the closest token.  -->
+            <StaticResource x:Key="MandrillColumnDividerBrush" ResourceKey="SystemControlForegroundListLowBrush" />
 
             <StaticResource x:Key="ListViewItemBackgroundPointerOver" ResourceKey="MandrillItemHoverBrush" />
             <StaticResource x:Key="ListViewItemBackgroundPressed" ResourceKey="MandrillItemSelectedBrush" />
@@ -58,7 +59,7 @@
             <Thickness x:Key="MandrillItemFocusSecondaryThickness">0</Thickness>
             <x:Double x:Key="MandrillRowSecondaryOpacity">0.773</x:Double><!--  0xC5 / 0xFF  -->
             <x:Double x:Key="MandrillRowTertiaryOpacity">0.529</x:Double><!--  0x87 / 0xFF  -->
-            <StaticResource x:Key="MandrillColumnDividerBrush" ResourceKey="SurfaceStrokeColorDefaultBrush" />
+            <StaticResource x:Key="MandrillColumnDividerBrush" ResourceKey="SystemControlForegroundListLowBrush" />
 
             <StaticResource x:Key="ListViewItemBackgroundPointerOver" ResourceKey="MandrillItemHoverBrush" />
             <StaticResource x:Key="ListViewItemBackgroundPressed" ResourceKey="MandrillItemSelectedBrush" />

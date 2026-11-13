@@ -65,6 +65,7 @@ public sealed partial class MainWindow : Window
         BuildLayoutMenu();
         BuildLayoutTiles();
         AddWindowShortcuts();
+        WatchStatusCells();
 
         _transientTimer = DispatcherQueue.CreateTimer();
         _transientTimer.IsRepeating = false;
@@ -96,6 +97,26 @@ public sealed partial class MainWindow : Window
 
     /// <summary>The pane area (tests).</summary>
     public LayoutHost Panes => PaneArea;
+
+    /// <summary>
+    /// Which status-bar separators show (WP-3): the one before a cell shows when that cell and some cell before it have text,
+    /// so an empty or hidden cell leaves no double or dangling line.
+    /// </summary>
+    /// <param name="filled">Per cell, left to right: visible and with text.</param>
+    /// <returns>Per separator (before cells 1..n-1): whether it shows.</returns>
+    public static bool[] StatusSeparators(IReadOnlyList<bool> filled)
+    {
+        ArgumentNullException.ThrowIfNull(filled);
+        var shown = new bool[Math.Max(0, filled.Count - 1)];
+        bool before = filled.Count > 0 && filled[0];
+        for (int i = 1; i < filled.Count; i++)
+        {
+            shown[i - 1] = before && filled[i];
+            before |= filled[i];
+        }
+
+        return shown;
+    }
 
     /// <summary>Shows a short message in the status bar (never a modal; ui-spec §7).</summary>
     /// <param name="text">Localized text.</param>
@@ -216,6 +237,38 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnItemsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => ScheduleCount();
+
+    private TextBlock[] StatusCells => [PaneText, CountText, StatusText, IndexText];
+
+    // Before cells 1..3, in the order of StatusSeparators' result.
+    private FrameworkElement[] StatusSeparatorLines => [CountSeparator, StatusSeparator, IndexSeparator];
+
+    // Every write to a cell's Text (and the index cell's Visibility) re-syncs the separators, wherever it comes from.
+    private void WatchStatusCells()
+    {
+        foreach (var line in StatusSeparatorLines)
+        {
+            HairLine.Snap(line);
+        }
+
+        foreach (var cell in StatusCells)
+        {
+            cell.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) => SyncStatusSeparators());
+        }
+
+        IndexText.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, (_, _) => SyncStatusSeparators());
+        SyncStatusSeparators();
+    }
+
+    private void SyncStatusSeparators()
+    {
+        bool[] shown = StatusSeparators([.. StatusCells.Select(c => c.Visibility == Visibility.Visible && c.Text.Length > 0)]);
+        var lines = StatusSeparatorLines;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            lines[i].Visibility = shown[i] ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
 
     private void UpdatePaneText()
     {

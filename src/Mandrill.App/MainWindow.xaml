@@ -145,12 +145,26 @@
         <!--  Pane area: 3×3 layout grid (architecture §6).  -->
         <v:LayoutHost x:Name="PaneArea" Grid.Row="2" />
 
-        <!--  Status bar (ui-spec §1): item count or selection, a free message area, then the index state (WP-2.3b).  -->
+        <!--
+            Status bar (ui-spec §1): item count or selection, a free message area, then the index state (WP-2.3b). Explorer's
+            faint separators sit centred in the 24 px gaps, over the full bar height, only between cells with text (code-behind).
+        -->
         <Grid
             Grid.Row="3"
             Padding="8,2"
             Background="{ThemeResource MandrillStatusBarBackgroundBrush}"
             ColumnSpacing="24">
+            <Grid.Resources>
+                <Style x:Key="StatusSeparatorStyle" TargetType="Rectangle">
+                    <Setter Property="Width" Value="1" />
+                    <Setter Property="Margin" Value="-12,-2,0,-2" />
+                    <Setter Property="HorizontalAlignment" Value="Left" />
+                    <Setter Property="Fill" Value="{ThemeResource MandrillStatusSeparatorBrush}" />
+                    <Setter Property="IsHitTestVisible" Value="False" />
+                    <Setter Property="AutomationProperties.AccessibilityView" Value="Raw" />
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Style>
+            </Grid.Resources>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" MaxWidth="480" />
                 <ColumnDefinition Width="Auto" />
@@ -177,6 +191,18 @@
                 Foreground="{ThemeResource MandrillStatusBarForegroundBrush}"
                 TextTrimming="CharacterEllipsis"
                 Visibility="Collapsed" />
+            <Rectangle
+                x:Name="CountSeparator"
+                Grid.Column="1"
+                Style="{StaticResource StatusSeparatorStyle}" />
+            <Rectangle
+                x:Name="StatusSeparator"
+                Grid.Column="2"
+                Style="{StaticResource StatusSeparatorStyle}" />
+            <Rectangle
+                x:Name="IndexSeparator"
+                Grid.Column="3"
+                Style="{StaticResource StatusSeparatorStyle}" />
         </Grid>
     </Grid>
 </Window>

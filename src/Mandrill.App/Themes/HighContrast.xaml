@@ -31,6 +31,7 @@
     <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="MandrillHcFocusBrush" />
     <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="MandrillHcWindowBrush" />
     <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="MandrillHcTextBrush" />
+    <StaticResource x:Key="MandrillStatusSeparatorBrush" ResourceKey="MandrillHcTextBrush" />
     <StaticResource x:Key="MandrillRubberBandFillBrush" ResourceKey="MandrillHcTransparentBrush" />
     <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="MandrillHcFocusBrush" />
     <StaticResource x:Key="MandrillMainInstructionBrush" ResourceKey="MandrillHcTextBrush" />
@@ -93,6 +94,22 @@
     <StaticResource x:Key="ButtonBorderBrushPointerOver" ResourceKey="MandrillHcHighlightBrush" />
     <StaticResource x:Key="ButtonBorderBrushPressed" ResourceKey="MandrillHcHighlightBrush" />
     <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="MandrillHcDisabledBrush" />
+    <!--  View-mode ToggleButtons (pane tab row): checked is the highlight pair, like an accent button.  -->
+    <StaticResource x:Key="ToggleButtonBackgroundPointerOver" ResourceKey="MandrillHcHighlightBrush" />
+    <StaticResource x:Key="ToggleButtonBackgroundPressed" ResourceKey="MandrillHcHighlightBrush" />
+    <StaticResource x:Key="ToggleButtonBackgroundDisabled" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="MandrillHcHighlightBrush" />
+    <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="MandrillHcFocusBrush" />
+    <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="MandrillHcFocusBrush" />
+    <StaticResource x:Key="ToggleButtonBackgroundCheckedDisabled" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonForeground" ResourceKey="MandrillHcTextBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundPointerOver" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundPressed" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundDisabled" ResourceKey="MandrillHcDisabledBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="ToggleButtonForegroundCheckedDisabled" ResourceKey="MandrillHcDisabledBrush" />
     <StaticResource x:Key="DropDownButtonForegroundSecondary" ResourceKey="MandrillHcTextBrush" />
     <StaticResource x:Key="DropDownButtonForegroundSecondaryPointerOver" ResourceKey="MandrillHcWindowBrush" />
     <StaticResource x:Key="DropDownButtonForegroundSecondaryPressed" ResourceKey="MandrillHcWindowBrush" />

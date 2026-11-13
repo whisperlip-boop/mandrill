@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-    One pane (ui-spec §2): reserved tab row, toolbar (tree toggle, back, forward, up, new folder, view mode, refresh,
+    One pane (ui-spec §2): reserved tab row (Details / Large icons buttons at its right end), toolbar (tree toggle, back, forward, up, new folder, view mode, refresh,
     search, overflow »), path box, tree column (filled in WP-1.9) and the file list.
 -->
 <UserControl
@@ -16,6 +16,13 @@
             <Setter Property="Width" Value="28" />
             <Setter Property="Height" Value="28" />
             <Setter Property="Padding" Value="5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style x:Key="ViewModeButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="4" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
@@ -137,6 +144,27 @@
             <!--  ADR-0015: shown instead of the file list while the pane is at This PC.  -->
             <v:DriveListView x:Name="DriveRows" Grid.Column="2" Visibility="Collapsed" />
         </Grid>
+
+        <!--
+            Explorer's status-bar view buttons (Details, Large icons) at the right end of the tab row; the left stays free for
+            the tabs. Declared last so they are the pane's last Tab stops, like Explorer's.
+        -->
+        <StackPanel
+            x:Name="ViewModeButtons"
+            Margin="0,0,4,0"
+            HorizontalAlignment="Right"
+            Orientation="Horizontal"
+            Spacing="2">
+            <StackPanel.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceDictionary Source="ms-appx:///Themes/SubtleButtons.xaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
+            </StackPanel.Resources>
+            <ToggleButton x:Name="DetailsViewButton" Style="{StaticResource ViewModeButtonStyle}" />
+            <ToggleButton x:Name="LargeIconsViewButton" Style="{StaticResource ViewModeButtonStyle}" />
+        </StackPanel>
     </Grid>
     </Border>
     <Border

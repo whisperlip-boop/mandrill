@@ -8,8 +8,8 @@ using Microsoft.UI.Xaml.Shapes;
 namespace Mandrill.App.Views;
 
 /// <summary>
-/// Divider at the right edge of a Details header cell (ui-spec §2): a visible 1 px line in an 8 px grab zone centred on
-/// the column boundary, with the resize cursor. Drag resizes, double-click auto-fits.
+/// Divider at the right edge of a Details header cell (ui-spec §2): a full-height line of one physical pixel (Explorer's)
+/// in an 8 px grab zone centred on the column boundary, with the resize cursor. Drag resizes, double-click auto-fits.
 /// </summary>
 public sealed partial class ColumnGripper : Grid
 {
@@ -31,11 +31,11 @@ public sealed partial class ColumnGripper : Grid
         Line = new Rectangle
         {
             Width = 1,
-            Margin = new Thickness(0, 5, 0, 5),
             HorizontalAlignment = HorizontalAlignment.Center,
             IsHitTestVisible = false,
             Style = lineStyle,
         };
+        HairLine.Snap(Line);
         Children.Add(Line);
         PointerPressed += OnPressed;
         PointerMoved += OnMoved;

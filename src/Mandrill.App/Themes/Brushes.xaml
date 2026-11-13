@@ -12,6 +12,11 @@
             <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="AccentFillColorDefaultBrush" />
             <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
             <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <!--
+                Status-bar separators: the header dividers' tone. MandrillColumnDividerBrush stays in the list views' ExplorerItems.xaml:
+                at app level the theme flip after High contrast off cannot find it (owner round 6 crash, LayoutAndTreeTests).
+            -->
+            <StaticResource x:Key="MandrillStatusSeparatorBrush" ResourceKey="SystemControlForegroundListLowBrush" />
             <SolidColorBrush
                 x:Key="MandrillRubberBandFillBrush"
                 Opacity="0.25"
@@ -25,6 +30,7 @@
             <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="AccentFillColorDefaultBrush" />
             <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
             <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+            <StaticResource x:Key="MandrillStatusSeparatorBrush" ResourceKey="SystemControlForegroundListLowBrush" />
             <SolidColorBrush
                 x:Key="MandrillRubberBandFillBrush"
                 Opacity="0.25"
@@ -42,6 +48,7 @@
             <StaticResource x:Key="MandrillActivePaneBorderBrush" ResourceKey="SystemColorHighlightColorBrush" />
             <StaticResource x:Key="MandrillStatusBarBackgroundBrush" ResourceKey="SystemColorWindowColorBrush" />
             <StaticResource x:Key="MandrillStatusBarForegroundBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="MandrillStatusSeparatorBrush" ResourceKey="SystemColorWindowTextColorBrush" />
             <StaticResource x:Key="MandrillRubberBandFillBrush" ResourceKey="SubtleFillColorTransparentBrush" />
             <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="SystemColorHighlightColorBrush" />
             <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemColorHighlightColorBrush" />

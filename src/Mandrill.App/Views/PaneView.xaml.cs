@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
 
@@ -52,6 +53,7 @@ public sealed partial class PaneView : UserControl
         long cost = PerfLog.BeginCost();
         InitializeComponent();
         AppTheme.Track(Toolbar.Resources); // SubtleButtons.xaml scope
+        AppTheme.Track(ViewModeButtons.Resources);
         PerfLog.EndCost("PaneView XAML", cost);
         Files.ContextMenuRequested += (_, request) => ContextMenuRequested?.Invoke(this, request);
         DriveRows.ContextMenuRequested += (_, request) => ContextMenuRequested?.Invoke(this, request);
@@ -167,6 +169,9 @@ public sealed partial class PaneView : UserControl
         }
     }
 
+    /// <summary>The tab row's Details and Large icons buttons (tests).</summary>
+    public (ToggleButton Details, ToggleButton LargeIcons) ViewModeToggles => (DetailsViewButton, LargeIconsViewButton);
+
     /// <summary>The toolbar's "»" overflow button (tests).</summary>
     public DropDownButton OverflowMenuButton => OverflowButton;
 
@@ -223,6 +228,8 @@ public sealed partial class PaneView : UserControl
         OverflowButton.Content = IconProvider.CreateGlyph(IconProvider.MoreGlyph);
         OverflowButton.Flyout = LazyFlyout(FillOverflowFlyout, out _);
         Describe(OverflowButton, "pane.toolbar.more");
+        SetupViewToggle(DetailsViewButton, ViewChoices.Single(c => c.Key == "pane.view.details"));
+        SetupViewToggle(LargeIconsViewButton, ViewChoices.Single(c => c.Key == "pane.view.largeIcons"));
 
         PathInput.Attach(vm, _logger);
         PathInput.ListFocusRequested += (_, _) => FocusList(); // QA S3-5: a typed This PC focuses the drive list
@@ -522,14 +529,33 @@ public sealed partial class PaneView : UserControl
         _vm.SetView(choice.Mode); // ViewMode and IconSize changes re-sync the checks (OnViewModelChanged)
     }
 
+    // Explorer's status-bar pair in the tab row: the View menu's path. The click already flipped the check, so it re-syncs
+    // even when the mode did not change (clicking the checked one keeps it checked).
+    private void SetupViewToggle(ToggleButton button, ViewChoice choice)
+    {
+        button.Tag = choice;
+        button.Content = Icon(choice.Icon);
+        Describe(button, choice.Key);
+        button.Click += (_, _) =>
+        {
+            ApplyViewChoice(choice);
+            SyncViewChecks();
+        };
+    }
+
     private void SyncViewChecks()
     {
         foreach (var item in _viewItems)
         {
-            var choice = (ViewChoice)item.Tag;
-            item.IsChecked = _vm is not null && choice.Mode == _vm.ViewMode && (choice.IconSize is not { } size || size == _vm.IconSize);
+            item.IsChecked = IsCurrent((ViewChoice)item.Tag);
         }
+
+        DetailsViewButton.IsChecked = DetailsViewButton.Tag is ViewChoice details && IsCurrent(details);
+        LargeIconsViewButton.IsChecked = LargeIconsViewButton.Tag is ViewChoice large && IsCurrent(large);
     }
+
+    private bool IsCurrent(ViewChoice choice) =>
+        _vm is not null && choice.Mode == _vm.ViewMode && (choice.IconSize is not { } size || size == _vm.IconSize);
 
     // Inactive: the accent frame hides and the toolbar dims to 80 % (primary glyphs stay well above 4.5:1 in light and
     // dark); the list shows a grey selection. High contrast: no dimming at all (ui-spec §2: inactive text stays ≥ 4.5:1).
@@ -537,11 +563,11 @@ public sealed partial class PaneView : UserControl
     {
         ActiveFrame.Visibility = _isActive ? Visibility.Visible : Visibility.Collapsed;
         ActiveFrame.BorderThickness = new Thickness(AppTheme.IsHighContrast() ? 2 : 1); // owner #12: 1 px; HC keeps 2 px
-        Toolbar.Opacity = _isActive || AppTheme.IsHighContrast() ? 1.0 : 0.8;
+        Toolbar.Opacity = ViewModeButtons.Opacity = _isActive || AppTheme.IsHighContrast() ? 1.0 : 0.8;
         Files.IsActive = _isActive;
     }
 
-    // ADR-0015: the drive list replaces the file list; New folder and the view menu are off (FileListView keeps its state).
+    // ADR-0015: the drive list replaces the file list; New folder, the view menu and the view buttons are off (FileListView keeps its state).
     private void ApplyThisPc()
     {
         bool thisPc = _vm is { IsThisPc: true };
@@ -549,6 +575,8 @@ public sealed partial class PaneView : UserControl
         DriveRows.Visibility = thisPc ? Visibility.Visible : Visibility.Collapsed;
         NewFolderButton.IsEnabled = !thisPc;
         ViewButton.IsEnabled = !thisPc;
+        DetailsViewButton.IsEnabled = !thisPc;
+        LargeIconsViewButton.IsEnabled = !thisPc;
     }
 
     private void ApplyOverflow(double width)
