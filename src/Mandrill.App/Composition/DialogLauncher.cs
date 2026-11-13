@@ -77,7 +77,8 @@ public sealed class DialogLauncher
         {
             var picker = new LanguageDialog(_languages.Languages, _languages.AutoLanguage, _settings.Current.Language, _icons) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
             await picker.ShowAsync();
-            if (picker.Chosen is not { IsCurrent: false } chosen)
+            // Against the saved string, not IsCurrent: a saved code without its locale file shows Auto checked (QA L1 m6).
+            if (picker.Chosen is not { } chosen || string.Equals(chosen.Code, _settings.Current.Language, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }

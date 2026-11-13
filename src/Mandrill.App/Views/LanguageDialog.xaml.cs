@@ -2,6 +2,7 @@ using Mandrill.App.Icons;
 using Mandrill.App.Platform;
 using Mandrill.Core.Localization;
 using Mandrill.Presentation.Settings;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -35,9 +36,11 @@ public sealed partial class LanguageDialog : ContentDialog
         ArgumentNullException.ThrowIfNull(icons);
         InitializeComponent();
         AppTheme.Track(TitleRow.Resources); // SubtleButtons.xaml scope (the x)
+        AppTheme.Track(LanguageGrid.Resources); // ExplorerItems.xaml scope (cells)
         CloseButton.Content = icons.CreateElement(IconId.Close, size: 12);
         Fill(string.Empty);
-        Opened += (_, _) => SearchBox.Focus(FocusState.Programmatic);
+        // Deferred past the dialog's own initial focus (QA L1 MAJOR-1).
+        Opened += (_, _) => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => SearchBox.Focus(FocusState.Programmatic));
     }
 
     /// <summary>The picked cell, or null when the picker was closed without a choice.</summary>

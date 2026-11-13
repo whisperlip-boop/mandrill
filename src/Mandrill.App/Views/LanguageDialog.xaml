@@ -9,7 +9,7 @@
     AutomationProperties.Name="{m:Tr Key=dialog.language.title}">
     <!--  No footer buttons: the title row carries the x, as in the Windows language pickers.  -->
     <Grid
-        Width="504"
+        Width="492"
         PreviewKeyDown="OnPreviewKeyDown"
         RowSpacing="12">
         <Grid.RowDefinitions>
@@ -43,6 +43,7 @@
                 VerticalAlignment="Center"
                 AutomationProperties.Name="{m:Tr Key=dialog.language.close}"
                 Click="OnCloseClick"
+                TabIndex="2"
                 ToolTipService.ToolTip="{m:Tr Key=dialog.language.close}" />
         </Grid>
         <TextBox
@@ -50,9 +51,14 @@
             Grid.Row="1"
             AutomationProperties.Name="{m:Tr Key=dialog.language.search}"
             KeyDown="OnSearchKeyDown"
+            TabIndex="0"
             PlaceholderText="{m:Tr Key=dialog.language.search}"
             TextChanged="OnSearchTextChanged" />
-        <!--  Selection = the saved setting (it does not follow focus); a click, Enter or Space picks the focused cell.  -->
+        <!--
+            Selection = the saved setting (it does not follow focus); a click, Enter or Space picks the focused cell. Tab order
+            search, grid, x: ContentDialog focuses its first tab stop on open (QA L1 MAJOR-1). Cells are single-line: the text
+            styles wrap by default and ItemsWrapGrid sizes every cell from the first one (QA L1 MAJOR-2).
+        -->
         <GridView
             x:Name="LanguageGrid"
             Grid.Row="2"
@@ -63,11 +69,20 @@
             ItemClick="OnItemClick"
             SelectionChanged="OnSelectionChanged"
             SelectionMode="Single"
-            SingleSelectionFollowsFocus="False">
+            SingleSelectionFollowsFocus="False"
+            TabIndex="1">
+            <!--  Hover, selection and the secondary line's opacity as in the panes and search (also the HC palette; QA L1 m4).  -->
+            <GridView.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceDictionary Source="ms-appx:///Themes/ExplorerItems.xaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
+            </GridView.Resources>
             <GridView.ItemsPanel>
                 <ItemsPanelTemplate>
                     <ItemsWrapGrid
-                        ItemWidth="166"
+                        ItemWidth="164"
                         MaximumRowsOrColumns="3"
                         Orientation="Horizontal" />
                 </ItemsPanelTemplate>
@@ -88,12 +103,14 @@
                             <TextBlock
                                 Style="{ThemeResource BodyStrongTextBlockStyle}"
                                 Text="{x:Bind Name}"
-                                TextTrimming="CharacterEllipsis" />
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
                             <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Opacity="{ThemeResource MandrillRowSecondaryOpacity}"
                                 Style="{ThemeResource CaptionTextBlockStyle}"
                                 Text="{x:Bind Detail}"
-                                TextTrimming="CharacterEllipsis" />
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
                         </StackPanel>
                         <FontIcon
                             Grid.Column="1"
