@@ -4,7 +4,8 @@ namespace Mandrill.Core.Localization;
 /// <param name="Code">Locale code, the name of <c>Locales\&lt;code&gt;.json</c> and the settings.json value.</param>
 /// <param name="NativeName">Name in the language itself (Windows' display name).</param>
 /// <param name="EnglishName">Name in English.</param>
-public sealed record LanguageInfo(string Code, string NativeName, string EnglishName);
+/// <param name="Tag">BCP-47 tag for the UI framework (XAML font fallback and built-in control strings).</param>
+public sealed record LanguageInfo(string Code, string NativeName, string EnglishName, string Tag);
 
 /// <summary>The supported UI languages (docs/i18n.md): adding a language = one line here + one locale file.</summary>
 public static class LanguageCatalog
@@ -15,11 +16,11 @@ public static class LanguageCatalog
     /// <summary>Every supported language, sorted by English name (the picker's order).</summary>
     public static IReadOnlyList<LanguageInfo> All { get; } = new LanguageInfo[]
     {
-        new("en", "English (United States)", "English (United States)"),
-        new("ja", "日本語 (日本)", "Japanese (Japan)"),
-        new("ko", "한국어(대한민국)", "Korean (South Korea)"),
-        new("zh-Hans", "中文 (简体)", "Chinese (Simplified)"),
-        new("zh-Hant", "中文 (繁體)", "Chinese (Traditional)"),
+        new("en", "English (United States)", "English (United States)", "en-US"),
+        new("ja", "日本語 (日本)", "Japanese (Japan)", "ja-JP"),
+        new("ko", "한국어(대한민국)", "Korean (South Korea)", "ko-KR"),
+        new("zh-Hans", "中文 (简体)", "Chinese (Simplified)", "zh-CN"),
+        new("zh-Hant", "中文 (繁體)", "Chinese (Traditional)", "zh-TW"),
     }.OrderBy(l => l.EnglishName, StringComparer.Ordinal).ToArray();
 
     /// <summary>The supported language with this code (case-insensitive), or null.</summary>
