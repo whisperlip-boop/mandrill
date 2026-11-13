@@ -145,6 +145,7 @@ public sealed partial class DriveListView : UserControl
         {
             _scroller = scroller;
             _scroller.ViewChanged += (_, _) => _headerShift.X = -_scroller.HorizontalOffset; // the header scrolls with the rows
+            FileListView.ReserveHorizontalBar(_scroller);
         }
     }
 

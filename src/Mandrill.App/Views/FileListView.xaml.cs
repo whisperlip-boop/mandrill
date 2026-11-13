@@ -269,6 +269,34 @@ public sealed partial class FileListView : UserControl
         return null;
     }
 
+    /// <summary>
+    /// WinUI's scroll bars float over the content; Explorer's take room. While the horizontal bar shows, the scroller's
+    /// viewport ends above it so no row ends under it on any scroll path (owner #2; file, drive and search lists).
+    /// </summary>
+    /// <param name="scroller">The list's scroller.</param>
+    internal static void ReserveHorizontalBar(ScrollViewer scroller)
+    {
+        scroller.RegisterPropertyChangedCallback(ScrollViewer.ComputedHorizontalScrollBarVisibilityProperty, (sender, _) => ApplyBarReserve((ScrollViewer)sender));
+        ApplyBarReserve(scroller);
+    }
+
+    // The ScrollBar style's MinHeight plus the padding of the bar's host in the ScrollViewer template (it is not laid out yet
+    // when the bar appears). The scroller's Padding (its content presenter's margin), not the list's: ScrollIntoView and
+    // keyboard moves bring a row to the viewport's edge, which the list's padding left under the bar.
+    private static void ApplyBarReserve(ScrollViewer scroller)
+    {
+        if (scroller.ComputedHorizontalScrollBarVisibility == Visibility.Visible
+            && Descendant<ScrollBar>(scroller, b => b.Orientation == Orientation.Horizontal) is { } bar)
+        {
+            var host = VisualTreeHelper.GetParent(bar) as Grid;
+            scroller.Padding = new Thickness(0, 0, 0, bar.MinHeight + (host?.Padding.Top ?? 0) + (host?.Padding.Bottom ?? 0));
+        }
+        else
+        {
+            scroller.ClearValue(Control.PaddingProperty);
+        }
+    }
+
     internal static T? Descendant<T>(DependencyObject root, Func<T, bool>? match = null)
         where T : DependencyObject
     {
@@ -434,35 +462,10 @@ public sealed partial class FileListView : UserControl
         if (_scroller is not null)
         {
             _scroller.ViewChanged += OnViewChanged;
-            _scroller.RegisterPropertyChangedCallback(ScrollViewer.ComputedHorizontalScrollBarVisibilityProperty, OnHorizontalBarShown);
-            OnHorizontalBarShown(_scroller, ScrollViewer.ComputedHorizontalScrollBarVisibilityProperty);
+            ReserveHorizontalBar(_scroller);
         }
 
         _scrollToStartOnLoad = false; // a first-time loaded list starts at the top
-    }
-
-    // WinUI's scroll bars float over the content; Explorer's take room. While the horizontal bar shows (Details, List), the
-    // scroller's viewport ends above it so no row ends under it (owner #2): the ScrollBar style's MinHeight plus the padding
-    // of the bar's host in the ScrollViewer template (it is not laid out yet when the bar appears). The scroller's Padding
-    // (its content presenter's margin), not the list's: ScrollIntoView and keyboard moves bring a row to the viewport's
-    // edge, which the list's padding left under the bar.
-    private void OnHorizontalBarShown(DependencyObject sender, DependencyProperty dp)
-    {
-        if (!ReferenceEquals(sender, _scroller) || _list is null)
-        {
-            return; // a discarded list of a previous view mode
-        }
-
-        if (_scroller.ComputedHorizontalScrollBarVisibility == Visibility.Visible
-            && Descendant<ScrollBar>(_scroller, b => b.Orientation == Orientation.Horizontal) is { } bar)
-        {
-            var host = VisualTreeHelper.GetParent(bar) as Grid;
-            _scroller.Padding = new Thickness(0, 0, 0, bar.MinHeight + (host?.Padding.Top ?? 0) + (host?.Padding.Bottom ?? 0));
-        }
-        else
-        {
-            _scroller.ClearValue(Control.PaddingProperty);
-        }
     }
 
     private void OnViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)

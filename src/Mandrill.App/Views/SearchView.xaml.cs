@@ -98,6 +98,7 @@ public sealed partial class SearchView : UserControl
             {
                 _scroller = scroller;
                 _scroller.ViewChanged += (_, _) => _headerShift.X = -_scroller.HorizontalOffset;
+                FileListView.ReserveHorizontalBar(_scroller);
             }
         };
         AddAccelerator(VirtualKey.F, VirtualKeyModifiers.Control, FocusQuery);
