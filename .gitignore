@@ -26,3 +26,6 @@ tools/
 CLAUDE.md
 .claude/
 Mandrill.Dev.sln
+
+# Installer output (installer/Mandrill.iss)
+dist/
