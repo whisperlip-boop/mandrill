@@ -27,6 +27,8 @@ public static class TabPalette
 
     private const byte HoverAlpha = 0x0F;   // black 6 %
     private const byte PressedAlpha = 0x1A; // black 10 %
+    private const byte CloseHoverAlpha = 0x1F;   // black 12 % on the tab's fill
+    private const byte ClosePressedAlpha = 0x33; // black 20 %
     private const double ScrimOpacity = 0.35;
 
     private static readonly Color Black = Color.FromArgb(255, 0, 0, 0);
@@ -58,6 +60,13 @@ public static class TabPalette
         };
         return paneActive ? fill : Over(fill, Color.FromArgb((byte)Math.Round(255 * ScrimOpacity), rowBackground.R, rowBackground.G, rowBackground.B));
     }
+
+    /// <summary>The x button's opaque hover or pressed fill on the tab's current fill (ui-spec §2a).</summary>
+    /// <param name="tabFill">The tab's fill (<see cref="Fill"/>).</param>
+    /// <param name="pressed">Pressed rather than hover.</param>
+    /// <returns>The opaque fill.</returns>
+    public static Color CloseFill(Color tabFill, bool pressed)
+        => Over(tabFill, Color.FromArgb(pressed ? ClosePressedAlpha : CloseHoverAlpha, 0, 0, 0));
 
     /// <summary>The text colour on <paramref name="fill"/>.</summary>
     /// <param name="color">Colour index 0..9.</param>

@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.Foundation;
+using Windows.UI;
 using Path = Microsoft.UI.Xaml.Shapes.Path;
 
 namespace Mandrill.App.Views;
@@ -48,7 +49,9 @@ public sealed partial class PaneTabItem : ContentControl
     private readonly TextBlock _text = new() { TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _close;
     private readonly Grid _band;
-    private readonly IconElement _closeGlyph;
+    private readonly SolidColorBrush _closeOver = new();
+    private readonly SolidColorBrush _closePressed = new();
+    private readonly SolidColorBrush _closeInk = new();
     private bool _hover;
     private bool _pressed;
     private double _shapeWidth;
@@ -67,7 +70,6 @@ public sealed partial class PaneTabItem : ContentControl
 
         _text.FontFamily = (FontFamily)Application.Current.Resources["MandrillListFontFamily"];
         _text.FontSize = (double)Application.Current.Resources["MandrillListFontSize"];
-        _closeGlyph = icons.CreateElement(IconId.Close, size: 10);
         _close = new Button
         {
             Width = 20,
@@ -78,9 +80,16 @@ public sealed partial class PaneTabItem : ContentControl
             VerticalAlignment = VerticalAlignment.Top,
             BorderThickness = new Thickness(0),
             IsTabStop = false,
-            Content = _closeGlyph,
+            Content = icons.CreateElement(IconId.Close, size: 10), // inherits the template's foreground (HC hover inverts it)
             Visibility = Visibility.Collapsed,
         };
+
+        // The subtle hover/pressed fills are near-transparent: on a coloured tab they barely show, and the template's 83 ms
+        // brush transition from the opaque rest fill dips through a dark tint first. Opaque per-tab brushes instead.
+        _close.Resources["ButtonBackgroundPointerOver"] = _closeOver;
+        _close.Resources["ButtonBackgroundPressed"] = _closePressed;
+        _close.Resources["ButtonForegroundPointerOver"] = _closeInk;
+        _close.Resources["ButtonForegroundPressed"] = _closeInk;
         AutomationProperties.SetAccessibilityView(_close, AccessibilityView.Raw); // mouse-only; the menu has Close tab
         AutomationProperties.SetAccessibilityView(_text, AccessibilityView.Raw);  // the tab item carries the name
         _close.Click += (_, _) => _strip.Close(this);
@@ -163,9 +172,11 @@ public sealed partial class PaneTabItem : ContentControl
         _edge.Stroke = look.Edge;
         _edge.StrokeThickness = look.EdgeThickness;
         _text.Foreground = look.Text;
-        _closeGlyph.Foreground = look.Text;
         _close.Foreground = look.Text;
         _close.Background = look.Fill; // narrow tabs: the x covers the text end on a solid tab fill
+        _closeOver.Color = look.CloseOver;
+        _closePressed.Color = look.ClosePressed;
+        _closeInk.Color = look.CloseInk;
         _band.Margin = new Thickness(TextLeft, InactiveTop, width >= NarrowWidth ? CloseReserve : NarrowReserve, 0);
         _text.FontWeight = new Windows.UI.Text.FontWeight(Tab.IsActive ? (ushort)700 : (ushort)400); // FontWeights statics are not activatable unpackaged (measured)
 
@@ -249,4 +260,7 @@ public sealed partial class PaneTabItem : ContentControl
 /// <param name="EdgeThickness">Outline width.</param>
 /// <param name="FocusOuter">Outer focus ring.</param>
 /// <param name="FocusInner">Inner focus ring.</param>
-internal sealed record TabLook(Brush Fill, Brush Text, Brush Edge, double EdgeThickness, Brush FocusOuter, Brush FocusInner);
+/// <param name="CloseOver">The x button's hover fill.</param>
+/// <param name="ClosePressed">The x button's pressed fill.</param>
+/// <param name="CloseInk">The x glyph on those fills.</param>
+internal sealed record TabLook(Brush Fill, Brush Text, Brush Edge, double EdgeThickness, Brush FocusOuter, Brush FocusInner, Color CloseOver, Color ClosePressed, Color CloseInk);

@@ -328,19 +328,26 @@ public sealed partial class PaneTabStrip : UserControl
         {
             Brush fill = highlighted ? HcActiveSwatch.Background : HcSwatch.Background;
             Brush text = highlighted ? HcActiveSwatch.BorderBrush : HcSwatch.BorderBrush;
+            // The x on hover/press: the tab's system pair inverted (visible on every HC tab fill, including Highlight).
+            Color hcFill = ((SolidColorBrush)fill).Color;
+            Color hcText = ((SolidColorBrush)text).Color;
             return item.VisualState != TabVisualState.Rest || item.IsDragging
-                ? new TabLook(fill, text, HcHoverSwatch.Background, 2, focusOuter, focusInner) // HC pressed = HC hover
-                : new TabLook(fill, text, highlighted ? ActivePaneSwatch.Background : HcSwatch.BorderBrush, active && !_isPaneActive ? 2 : 1, focusOuter, focusInner);
+                ? new TabLook(fill, text, HcHoverSwatch.Background, 2, focusOuter, focusInner, hcText, hcText, hcFill) // HC pressed = HC hover
+                : new TabLook(fill, text, highlighted ? ActivePaneSwatch.Background : HcSwatch.BorderBrush, active && !_isPaneActive ? 2 : 1, focusOuter, focusInner, hcText, hcText, hcFill);
         }
 
         Color fillColor = TabPalette.Fill(item.Tab.Color, item.VisualState, _isPaneActive, RowBackground);
+        Color textColor = TabPalette.Text(item.Tab.Color, fillColor, _isPaneActive);
         return new TabLook(
             new SolidColorBrush(fillColor),
-            new SolidColorBrush(TabPalette.Text(item.Tab.Color, fillColor, _isPaneActive)),
+            new SolidColorBrush(textColor),
             highlighted ? ActivePaneSwatch.Background : EdgeSwatch.Background, // owner: the active pane's selected tab takes its frame colour
             item.IsDragging ? 2 : 1,
             focusOuter,
-            focusInner);
+            focusInner,
+            TabPalette.CloseFill(fillColor, pressed: false),
+            TabPalette.CloseFill(fillColor, pressed: true),
+            textColor);
     }
 
     /// <inheritdoc/>
