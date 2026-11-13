@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Mandrill.Core.IO;
+using Mandrill.Core.Localization;
 using Mandrill.Core.State;
 
 namespace Mandrill.Presentation.Panes;
@@ -51,6 +52,7 @@ public sealed partial class PaneViewModel
         FolderError = null;
         PathError = false;
         SetActiveTab(tab);
+        PathText = PathUtil.IsThisPc(tab.Location) ? Localizer.Current["thispc.name"] : tab.Location; // the box shows this tab, not the last one
         ViewMode = tab.ViewMode;
         SortColumn = tab.Sort.Column;
         SortDescending = tab.Sort.Descending;

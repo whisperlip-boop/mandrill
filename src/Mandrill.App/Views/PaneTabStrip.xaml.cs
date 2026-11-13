@@ -177,12 +177,13 @@ public sealed partial class PaneTabStrip : UserControl
     /// <summary>Left button pressed on a tab at <paramref name="x"/> (row coordinates): activates it; may become a drag.</summary>
     /// <param name="item">The tab.</param>
     /// <param name="x">Pointer x in the row.</param>
-    public void PressTab(PaneTabItem item, double x)
+    /// <param name="pointerId">The pressing pointer; events of other pointers are ignored (0 in tests).</param>
+    public void PressTab(PaneTabItem item, double x, uint pointerId = 0)
     {
         ArgumentNullException.ThrowIfNull(item);
         CancelDrag();
         Activate(item);
-        _press = new Press(item, x, _items.IndexOf(item)) { StartOffset = _offset };
+        _press = new Press(item, x, _items.IndexOf(item), _offset, pointerId);
     }
 
     /// <summary>The pointer moved while pressed: past <see cref="DragThreshold"/> the tab follows it and the others slide aside.</summary>
@@ -340,15 +341,16 @@ public sealed partial class PaneTabStrip : UserControl
     /// <inheritdoc/>
     protected override AutomationPeer OnCreateAutomationPeer() => new PaneTabStripAutomationPeer(this);
 
-    // One animation per transform: a new target or a direct set replaces the running one (else it would win on completion).
+    // One animation per transform. A new target starts from the in-flight value (no From) and then retires the old
+    // storyboard; a direct set stops it (else it would win on completion).
     private void Animate(TranslateTransform target, double to, int milliseconds)
     {
-        if (_animations.TryGetValue(target, out var running) ? running.To == to : target.X == to)
+        bool hasRunning = _animations.TryGetValue(target, out var running);
+        if (hasRunning ? running.To == to : target.X == to)
         {
             return;
         }
 
-        SetShift(target, target.X);
         var animation = new DoubleAnimation
         {
             To = to,
@@ -368,6 +370,10 @@ public sealed partial class PaneTabStrip : UserControl
         };
         _animations[target] = (storyboard, to);
         storyboard.Begin();
+        if (hasRunning)
+        {
+            running.Board.Stop();
+        }
     }
 
     // Stops a running animation of the transform, then sets its value.
@@ -434,6 +440,7 @@ public sealed partial class PaneTabStrip : UserControl
         }
 
         CancelDrag();
+        int countBefore = _items.Count;
         bool focusInRow = HasFocusWithin();
         var keep = new HashSet<PaneTab>(_vm.Tabs);
         foreach (PaneTabItem gone in _items.Where(i => !keep.Contains(i.Tab)).ToList())
@@ -454,6 +461,7 @@ public sealed partial class PaneTabStrip : UserControl
                 item.PointerMoved += OnTabPointerMoved;
                 item.PointerReleased += OnTabPointerReleased;
                 item.PointerCaptureLost += OnTabCaptureLost;
+                item.PointerCanceled += OnTabPointerCanceled;
                 _byTab[tab] = item;
                 _track.Children.Add(item);
             }
@@ -476,6 +484,11 @@ public sealed partial class PaneTabStrip : UserControl
         ApplyCanAdd();
         ArrangeTabs();
         RefreshAll();
+        if (_items.Count != countBefore && ActiveItem is { } shown)
+        {
+            BringIntoView(shown); // after a close the active tab's slot moved
+        }
+
         if (focusInRow && !HasFocusWithin())
         {
             // The focused tab was closed: focus the tab the close activated (ui-spec §2a).
@@ -498,6 +511,7 @@ public sealed partial class PaneTabStrip : UserControl
         _viewport.Width = _layout.Viewport;
         _viewport.Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, _layout.Viewport, 24) };
         Canvas.SetLeft(_plusHost, viewportLeft + _layout.Viewport + 4); // pinned after the viewport: it never scrolls
+        RowCanvas.Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, Math.Max(0, ActualWidth - RowCanvas.Margin.Left - _reservedRight), 24) }; // never under the view buttons
         for (int i = 0; i < n; i++)
         {
             PaneTabItem item = _items[i];
@@ -522,8 +536,21 @@ public sealed partial class PaneTabStrip : UserControl
             SetShift(_scroll, -_offset);
         }
 
-        _left.IsEnabled = _offset > 0.5;
-        _right.IsEnabled = _offset < max - 0.5;
+        bool leftOn = _offset > 0.5;
+        bool rightOn = _offset < max - 0.5;
+        _left.IsEnabled |= leftOn;
+        _right.IsEnabled |= rightOn;
+        if (!leftOn && rightOn && _left.FocusState != FocusState.Unfocused)
+        {
+            _right.Focus(FocusState.Keyboard); // a focused chevron that disables itself must not drop the focus
+        }
+        else if (!rightOn && leftOn && _right.FocusState != FocusState.Unfocused)
+        {
+            _left.Focus(FocusState.Keyboard);
+        }
+
+        _left.IsEnabled = leftOn;
+        _right.IsEnabled = rightOn;
     }
 
     private void BringIntoView(PaneTabItem item)
@@ -556,7 +583,14 @@ public sealed partial class PaneTabStrip : UserControl
         }
 
         double inView = press.LastX - _viewport.ActualOffset.X;
+        double before = _offset;
         ScrollTo(_offset + (inView < EdgeScrollZone ? -EdgeScrollStep : EdgeScrollStep), animate: false);
+        if (_offset == before)
+        {
+            _edgeScroll.Stop(); // at a scroll limit: nothing more to do until the pointer moves
+            return;
+        }
+
         DragTo(press.LastX);
     }
 
@@ -611,38 +645,64 @@ public sealed partial class PaneTabStrip : UserControl
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             var item = (PaneTabItem)sender;
-            PressTab(item, e.GetCurrentPoint(RowCanvas).Position.X);
+            PressTab(item, e.GetCurrentPoint(RowCanvas).Position.X, e.Pointer.PointerId);
             item.CapturePointer(e.Pointer);
         }
     }
 
+    // Only the pointer that pressed, on the tab it pressed, drives the press (a second finger or a stray hover does not).
+    private bool IsPressPointer(object sender, PointerRoutedEventArgs e)
+        => _press is { } press && ReferenceEquals(sender, press.Item) && e.Pointer.PointerId == press.PointerId;
+
     private void OnTabPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (_press is not null)
+        if (!IsPressPointer(sender, e))
+        {
+            return;
+        }
+
+        if (e.GetCurrentPoint(this).IsInContact)
         {
             DragTo(e.GetCurrentPoint(RowCanvas).Position.X);
+        }
+        else
+        {
+            CancelDrag(); // the release was never seen
         }
     }
 
     private void OnTabPointerReleased(object sender, PointerRoutedEventArgs e)
     {
-        if (_press is not null)
+        if (IsPressPointer(sender, e))
         {
             ReleaseTab();
             e.Handled = true;
         }
     }
 
-    // A capture lost with the button up is the release itself (the order of the two events is not relied on).
+    // A capture lost with the contact up is the release itself (the order of the two events is not relied on).
     private void OnTabCaptureLost(object sender, PointerRoutedEventArgs e)
     {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (!IsPressPointer(sender, e))
+        {
+            return;
+        }
+
+        if (e.GetCurrentPoint(this).IsInContact)
         {
             CancelDrag();
         }
         else
         {
             ReleaseTab();
+        }
+    }
+
+    private void OnTabPointerCanceled(object sender, PointerRoutedEventArgs e)
+    {
+        if (IsPressPointer(sender, e))
+        {
+            CancelDrag();
         }
     }
 
@@ -731,8 +791,7 @@ public sealed partial class PaneTabStrip : UserControl
             switch (item.Tag as string)
             {
                 case "new" or "duplicate":
-                    item.IsEnabled = canAdd; // disabled, not hidden, at the limit
-                    ToolTipService.SetToolTip(item, canAdd ? null : Localizer.Current["pane.tab.limitReached"]);
+                    item.IsEnabled = canAdd; // disabled, not hidden, at the limit; HelpText only (lead: no tooltip, as in Windows)
                     AutomationProperties.SetHelpText(item, canAdd ? string.Empty : Localizer.Current["pane.tab.limitReached"]);
                     break;
                 default:
@@ -810,7 +869,7 @@ public sealed partial class PaneTabStrip : UserControl
     }
 
     // One left-button press on a tab; becomes a drag past the threshold.
-    private sealed class Press(PaneTabItem item, double startX, int from)
+    private sealed class Press(PaneTabItem item, double startX, int from, double startOffset, uint pointerId)
     {
         public PaneTabItem Item { get; } = item;
 
@@ -818,7 +877,9 @@ public sealed partial class PaneTabStrip : UserControl
 
         public int From { get; } = from;
 
-        public double StartOffset { get; set; }
+        public double StartOffset { get; } = startOffset;
+
+        public uint PointerId { get; } = pointerId;
 
         public double LastX { get; set; } = startX;
 
