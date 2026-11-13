@@ -153,7 +153,7 @@ public sealed partial class PaneTabItem : ContentControl
             _shapeTop = top;
             _hit.Data = Trapezoid(width, 0, 0, Radius);
             _shape.Data = Trapezoid(width, top, 0, Radius);
-            _edge.Data = Trapezoid(width, top, 0, Radius);
+            _edge.Data = Trapezoid(width, Math.Max(top, 0.5), 0, Radius); // the active tab's top stroke stays inside the row (clipped at y 0)
             _ringOuter.Data = Trapezoid(width, top, 1, Radius);
             _ringInner.Data = Trapezoid(width, top, 2.5, Radius);
         }
