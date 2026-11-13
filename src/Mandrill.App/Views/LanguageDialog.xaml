@@ -8,13 +8,14 @@
     xmlns:s="using:Mandrill.Presentation.Settings"
     AutomationProperties.Name="{m:Tr Key=dialog.language.title}">
     <!--
-        Three cells of LanguageCellWidth hold every name on one line (SessionSettingsTests measures them); the dialog widens
-        to fit: content width = ContentDialogMaxWidth - 48 (the dialog's 24 px padding on each side). The content only caps
-        its width, so in a narrower window the dialog shrinks and the grid reflows to fewer columns and scrolls (QA L1 MAJOR-3).
+        Three cells of LanguageCellWidth hold every name on one line (SessionSettingsTests measures them). The dialog may grow
+        to hold them: its room for content is ContentDialogMaxWidth - 2 × 24 padding - 2 × ContentDialogBorderWidth (1, or 2 in
+        high contrast), so 690 leaves ≥ 638 for the 630 the grid wants (at 678 only 628 was left: 2 columns, QA L1 round 3).
+        The content only caps its width: in a narrower window the dialog shrinks and the grid reflows and scrolls (MAJOR-3).
     -->
     <ContentDialog.Resources>
         <x:Double x:Key="LanguageCellWidth">210</x:Double>
-        <x:Double x:Key="ContentDialogMaxWidth">678</x:Double>
+        <x:Double x:Key="ContentDialogMaxWidth">690</x:Double>
     </ContentDialog.Resources>
     <!--  No footer buttons: the title row carries the x, as in the Windows language pickers.  -->
     <Grid
