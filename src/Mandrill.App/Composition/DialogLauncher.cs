@@ -75,17 +75,29 @@ public sealed class DialogLauncher
         _open = true;
         try
         {
-            var picker = new LanguageDialog(_languages.Languages, _languages.AutoLanguage, _settings.Current.Language, _icons) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
+            var before = _settings.Current;
+            var picker = new LanguageDialog(_languages.Languages, _languages.AutoLanguage, before.Language, _icons) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
             await picker.ShowAsync();
             // Against the saved string, not IsCurrent: a saved code without its locale file shows Auto checked (QA L1 m6).
-            if (picker.Chosen is not { } chosen || string.Equals(chosen.Code, _settings.Current.Language, StringComparison.OrdinalIgnoreCase))
+            if (picker.Chosen is not { } chosen || string.Equals(chosen.Code, before.Language, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
-            if (!await _settings.SaveAsync(_settings.Current with { Language = chosen.Code }, CancellationToken.None))
+            if (!await _settings.SaveAsync(before with { Language = chosen.Code }, CancellationToken.None))
             {
+                // SaveAsync applied the new value before the write failed: put the old one back, so neither the next picker
+                // nor a later Settings save treats the unsaved language as saved (CR1). This write retries the unchanged file.
+                await _settings.SaveAsync(_settings.Current with { Language = before.Language }, CancellationToken.None);
                 _showStatus(Localizer.Current["dialog.settings.error.save"]);
+                return;
+            }
+
+            // Saved, but no restart needed when the running language already is the effective choice (CR2: Auto → 한국어 on ko).
+            string effective = chosen.Code == LanguageCatalog.Auto ? _languages.AutoLanguage : chosen.Code;
+            if (string.Equals(effective, Localizer.Current.Language, StringComparison.Ordinal))
+            {
+                _logger.LogInformation("Language {Language} saved; already in effect, no restart offered", chosen.Code);
                 return;
             }
 
