@@ -30,8 +30,12 @@ public sealed partial class PaneTabItem : ContentControl
     public const double Slant = 8;
 
     private const double Radius = 6;
-    private const double TextLeft = Slant + 6;
-    private const double CloseReserve = 24;
+    // Text and x stay clear of the 16 px a neighbour overlaps (QA F4/F5): the left neighbour's slant covers up to x 16, the
+    // right neighbour's from W − 16 on, and the active tab must stay topmost there.
+    private const double TextLeft = 2 * Slant + 4;
+    private const double CloseRight = 2 * Slant + 4;
+    private const double CloseReserve = CloseRight + 20 + 4;
+    private const double NarrowReserve = 2 * Slant + 4;
     private const double NarrowWidth = 120;
 
     private readonly PaneTabStrip _strip;
@@ -67,7 +71,7 @@ public sealed partial class PaneTabItem : ContentControl
             Width = 20,
             Height = 20,
             Padding = new Thickness(5),
-            Margin = new Thickness(0, InactiveTop, 12, 0),
+            Margin = new Thickness(0, InactiveTop, CloseRight, 0),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
             BorderThickness = new Thickness(0),
@@ -155,7 +159,7 @@ public sealed partial class PaneTabItem : ContentControl
         _closeGlyph.Foreground = look.Text;
         _close.Foreground = look.Text;
         _close.Background = look.Fill; // narrow tabs: the x covers the text end on a solid tab fill
-        _band.Margin = new Thickness(TextLeft, InactiveTop, width >= NarrowWidth ? CloseReserve : 4, 0);
+        _band.Margin = new Thickness(TextLeft, InactiveTop, width >= NarrowWidth ? CloseReserve : NarrowReserve, 0);
         _text.FontWeight = new Windows.UI.Text.FontWeight(Tab.IsActive ? (ushort)700 : (ushort)400); // FontWeights statics are not activatable unpackaged (measured)
 
         bool keyboardFocus = FocusState == FocusState.Keyboard;

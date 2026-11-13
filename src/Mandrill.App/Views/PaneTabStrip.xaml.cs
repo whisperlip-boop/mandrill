@@ -283,16 +283,21 @@ public sealed partial class PaneTabStrip : UserControl
         }
     }
 
-    /// <summary>Left/Right/Home/End: moves the keyboard focus (the roving Tab stop) to a tab without activating it.</summary>
+    /// <summary>Left/Right/Home/End: moves the focus (the roving Tab stop) to a tab without activating it.</summary>
     /// <param name="item">The tab.</param>
+    /// <param name="state">Keyboard (focus ring) or Programmatic.</param>
     /// <returns>Whether the tab got the focus.</returns>
-    public bool FocusTab(PaneTabItem item)
+    public bool FocusTab(PaneTabItem item, FocusState state = FocusState.Keyboard)
     {
         ArgumentNullException.ThrowIfNull(item);
         SetRoving(item);
         BringIntoView(item);
-        return item.Focus(FocusState.Keyboard);
+        return item.Focus(state);
     }
+
+    /// <summary>Parks the focus on the active tab without a focus ring (the pane swaps its list under the focus, QA F1).</summary>
+    /// <returns>Whether the tab got the focus.</returns>
+    public bool HoldFocus() => ActiveItem is { } item && FocusTab(item, FocusState.Programmatic);
 
     internal int IndexOf(PaneTabItem item) => _items.IndexOf(item);
 
@@ -501,6 +506,7 @@ public sealed partial class PaneTabStrip : UserControl
     {
         int n = _items.Count;
         double available = ActualWidth - RowCanvas.Margin.Left - _reservedRight - TabStripLayout.PlusSlot;
+        TabStripLayout previous = _layout;
         _layout = TabStripLayout.Compute(available, n);
         bool overflow = _layout.Overflow;
         _left.Visibility = _right.Visibility = _more.Visibility = overflow ? Visibility.Visible : Visibility.Collapsed;
@@ -521,6 +527,10 @@ public sealed partial class PaneTabStrip : UserControl
         }
 
         ScrollTo(_offset, animate: false);
+        if (_layout.Viewport != previous.Viewport && ActiveItem is { } active)
+        {
+            BringIntoView(active, animate: false); // restore and resize: the active tab stays visible (QA F2)
+        }
     }
 
     private void ScrollTo(double offset, bool animate = true)
@@ -542,18 +552,18 @@ public sealed partial class PaneTabStrip : UserControl
         _right.IsEnabled |= rightOn;
         if (!leftOn && rightOn && _left.FocusState != FocusState.Unfocused)
         {
-            _right.Focus(FocusState.Keyboard); // a focused chevron that disables itself must not drop the focus
+            _right.Focus(_left.FocusState); // a focused chevron that disables itself must not drop the focus
         }
         else if (!rightOn && leftOn && _right.FocusState != FocusState.Unfocused)
         {
-            _left.Focus(FocusState.Keyboard);
+            _left.Focus(_right.FocusState);
         }
 
         _left.IsEnabled = leftOn;
         _right.IsEnabled = rightOn;
     }
 
-    private void BringIntoView(PaneTabItem item)
+    private void BringIntoView(PaneTabItem item, bool animate = true)
     {
         int index = _items.IndexOf(item);
         if (!_layout.Overflow || index < 0)
@@ -565,11 +575,11 @@ public sealed partial class PaneTabStrip : UserControl
         double right = left + _layout.TabWidth;
         if (left < _offset)
         {
-            ScrollTo(left);
+            ScrollTo(left, animate);
         }
         else if (right > _offset + _layout.Viewport)
         {
-            ScrollTo(right - _layout.Viewport);
+            ScrollTo(right - _layout.Viewport, animate);
         }
     }
 

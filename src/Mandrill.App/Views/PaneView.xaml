@@ -163,6 +163,9 @@
                     <ResourceDictionary.MergedDictionaries>
                         <ResourceDictionary Source="ms-appx:///Themes/SubtleButtons.xaml" />
                     </ResourceDictionary.MergedDictionaries>
+                    <!--  QA F3: high contrast fills disabled toggles with Window, which cut the tab strip under them (This PC).  -->
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundDisabled" Color="Transparent" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedDisabled" Color="Transparent" />
                 </ResourceDictionary>
             </StackPanel.Resources>
             <ToggleButton x:Name="DetailsViewButton" Style="{StaticResource ViewModeButtonStyle}" />

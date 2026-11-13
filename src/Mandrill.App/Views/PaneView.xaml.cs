@@ -15,6 +15,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace Mandrill.App.Views;
@@ -578,12 +579,33 @@ public sealed partial class PaneView : UserControl
     private void ApplyThisPc()
     {
         bool thisPc = _vm is { IsThisPc: true };
+
+        // Collapsing the focused list would move the focus to the next Tab stop, the next pane's tabs, which activates that
+        // pane (QA F1). Park it on this pane's tab, then give it to the list now shown once that has been laid out.
+        bool refocus = IsFocusIn(thisPc ? Files : DriveRows) && TabRow.HoldFocus();
         Files.Visibility = thisPc ? Visibility.Collapsed : Visibility.Visible;
         DriveRows.Visibility = thisPc ? Visibility.Visible : Visibility.Collapsed;
         NewFolderButton.IsEnabled = !thisPc;
         ViewButton.IsEnabled = !thisPc;
         DetailsViewButton.IsEnabled = !thisPc;
         LargeIconsViewButton.IsEnabled = !thisPc;
+        if (refocus)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => FocusList());
+        }
+    }
+
+    private bool IsFocusIn(UIElement root)
+    {
+        for (var d = XamlRoot is { } r ? FocusManager.GetFocusedElement(r) as DependencyObject : null; d is not null; d = VisualTreeHelper.GetParent(d))
+        {
+            if (ReferenceEquals(d, root))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void ApplyOverflow(double width)
