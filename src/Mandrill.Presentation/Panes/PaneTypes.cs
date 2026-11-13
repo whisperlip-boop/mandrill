@@ -40,6 +40,9 @@ public enum NavOrigin
 
     /// <summary>The shown folder or its drive went away; replaces the current history entry.</summary>
     Fallback,
+
+    /// <summary>A tab was activated: its history already points at the target, so a redirect replaces that entry.</summary>
+    Tab,
 }
 
 /// <summary>How a navigation ended.</summary>

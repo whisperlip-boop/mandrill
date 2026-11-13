@@ -60,6 +60,8 @@ public sealed class SessionController : IAsyncDisposable
         nameof(PaneViewModel.IconSize),
         nameof(PaneViewModel.Columns),
         nameof(PaneViewModel.PathHistory),
+        nameof(PaneViewModel.Tabs),
+        nameof(PaneViewModel.ActiveTab),
     ];
 
     private readonly LayoutManager _layout;

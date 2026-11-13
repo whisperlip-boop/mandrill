@@ -143,10 +143,10 @@ public sealed class LayoutManager
             // A pane beyond the favorite keeps its own tree state; a brand-new one gets the rule for this pane count.
             pane.TreeVisible = saved?.TreeVisible ?? (isNew ? DefaultTreeVisible(n) : pane.TreeVisible);
 
-            // An empty path opens the home folder and keeps the pane's view state.
+            // An empty path opens the home folder in the active tab and keeps the pane's view state, tabs and history.
             return path.Length > 0
                 ? pane.NavigateAsync(path, NavOrigin.Favorite)
-                : pane.RestoreAsync(pane.ToState() with { Path = string.Empty }, fallbackToAncestor: true);
+                : pane.RestoreAsync(pane.ToState() with { Path = string.Empty, Tabs = null }, fallbackToAncestor: true);
         });
 
         Current = id;
@@ -354,7 +354,7 @@ public sealed class LayoutManager
 
             // Shown before, but hiding cancelled its first navigation: keep its view state, open the active pane's folder.
             return pane.CurrentPath is null && !pane.IsThisPc
-                ? pane.RestoreAsync(pane.ToState() with { Path = activePath ?? string.Empty }, fallbackToAncestor: true)
+                ? pane.RestoreAsync(pane.ToState() with { Path = activePath ?? string.Empty, Tabs = null }, fallbackToAncestor: true)
                 : null;
         });
 
@@ -378,6 +378,7 @@ public sealed class LayoutManager
             if (i >= n)
             {
                 pane.SetVisible(false);
+                pane.DiscardBackgroundTabs(); // owner decision: a removed pane keeps only its active tab
                 continue;
             }
 

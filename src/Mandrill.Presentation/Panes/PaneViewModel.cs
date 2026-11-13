@@ -22,7 +22,6 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     private readonly PaneScanner _scanner;
     private readonly PaneContext _context;
     private readonly PaneScanSink _sink;
-    private readonly NavHistory _history = new();
     private readonly ILogger _logger;
     private readonly FsErrorLog _fsErrors;
 
@@ -57,6 +56,8 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         _logger = context.LoggerFactory.CreateLogger<PaneViewModel>();
         _fsErrors = new FsErrorLog(_logger);
         _sink = new PaneScanSink(context.Dispatcher, OnSnapshot, OnFailed);
+        ActiveTab = new PaneTab(0, string.Empty, ViewMode, SortState.Default) { IsActive = true };
+        Tabs.Add(ActiveTab);
         context.Drives.Changed += OnDrivesChanged;
     }
 
@@ -157,10 +158,10 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     public IReadOnlyList<string> PathHistory => _pathHistory.Items;
 
     /// <summary>Whether Back is possible (AC-1.16).</summary>
-    public bool CanGoBack => _history.CanGoBack;
+    public bool CanGoBack => ActiveTab.History.CanGoBack;
 
     /// <summary>Whether Forward is possible (AC-1.16).</summary>
-    public bool CanGoForward => _history.CanGoForward;
+    public bool CanGoForward => ActiveTab.History.CanGoForward;
 
     /// <summary>Whether Up is possible: from a folder, and from a drive root to This PC (AC-1.17); not at This PC.</summary>
     public bool CanGoUp => !IsThisPc && CurrentPath is { } p && (PathUtil.Parent(p) is not null || PathUtil.IsDriveRoot(p));
@@ -215,13 +216,21 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         return StartNavigation(path, NavOrigin.Open, fallback: false, select: name is null ? null : (name, false), keepOnFailure: true);
     }
 
-    /// <summary>Restores view state and history and navigates to the saved folder (AC-1.33). An empty path opens the home folder.</summary>
-    /// <param name="state">Saved pane state (normalized).</param>
+    /// <summary>
+    /// Restores view state and tabs and navigates to the saved folder (AC-1.33). An empty path opens the home folder.
+    /// Saved tabs replace the pane's tabs (empty histories); null <see cref="PaneState.Tabs"/> keeps them and their history.
+    /// </summary>
+    /// <param name="state">Saved pane state (normalized); its top-level path, view mode and sort are the active tab's.</param>
     /// <param name="fallbackToAncestor">Open the nearest existing ancestor when the folder is gone.</param>
     /// <returns>The navigation outcome.</returns>
     public Task<NavigationResult> RestoreAsync(PaneState state, bool fallbackToAncestor)
     {
         ArgumentNullException.ThrowIfNull(state);
+        if (state.Tabs is not null)
+        {
+            ResetTabs(state);
+        }
+
         ViewMode = state.ViewMode;
         SortColumn = state.Sort.Column;
         SortDescending = state.Sort.Descending;
@@ -239,15 +248,21 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
 
     /// <summary>Snapshot of the persisted pane state (AC-1.33).</summary>
     /// <returns>The state.</returns>
-    public PaneState ToState() => new(
-        IsThisPc ? PathUtil.ThisPc : CurrentPath ?? string.Empty,
-        ViewMode,
-        new SortState(SortColumn, SortDescending),
-        TreeVisible,
-        TreeWidth,
-        IconSize,
-        Columns,
-        _pathHistory.Snapshot());
+    public PaneState ToState()
+    {
+        var shown = new TabState(IsThisPc ? PathUtil.ThisPc : CurrentPath ?? string.Empty, ViewMode, new SortState(SortColumn, SortDescending), ActiveTab.Color);
+        return new(
+            shown.Path,
+            shown.ViewMode,
+            shown.Sort,
+            TreeVisible,
+            TreeWidth,
+            IconSize,
+            Columns,
+            _pathHistory.Snapshot(),
+            Tabs.Select(t => t == ActiveTab ? shown : t.ToState()).ToList(),
+            Tabs.IndexOf(ActiveTab));
+    }
 
     /// <summary>Opens an entry: folders navigate; files go to the shell (a folder shortcut navigates).</summary>
     /// <param name="entry">Entry of the shown folder.</param>
@@ -567,7 +582,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanGoBack))]
     private void Back()
     {
-        if (_history.Back() is { } target)
+        if (ActiveTab.History.Back() is { } target)
         {
             NotifyHistory();
             _ = StartNavigation(target, NavOrigin.Back, fallback: true);
@@ -577,7 +592,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanGoForward))]
     private void Forward()
     {
-        if (_history.Forward() is { } target)
+        if (ActiveTab.History.Forward() is { } target)
         {
             NotifyHistory();
             _ = StartNavigation(target, NavOrigin.Forward, fallback: true);
@@ -906,9 +921,9 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             {
                 // Even the drive root is gone (E-1.2, E-1.9; owner, stage 3): This PC is the last resort; it cannot fail.
                 request.Completion.TrySetResult(new NavigationResult(NavigationOutcome.Failed, request.Path, Error: error));
-                // Replace the history entry only if it already points at the dead target (Back/Forward/Retry/Gone);
+                // Replace the history entry only if it already points at the dead target (Back/Forward/Retry/Gone/Tab);
                 // a failed Open/Tree/Favorite/Restore never moved it, so the folder the user was in stays (AC-1.16).
-                bool replace = request.Origin is NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback or NavOrigin.Refresh;
+                bool replace = request.Origin is NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback or NavOrigin.Refresh or NavOrigin.Tab;
                 _ = StartNavigation(PathUtil.ThisPc, replace ? NavOrigin.Fallback : request.Origin, fallback: false, statusOnCommit: ErrorStatus(error));
             }
 
@@ -944,17 +959,17 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         _reconcileIfKept = false;
         switch (request.Origin)
         {
-            case NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback:
-                if (!PathUtil.PathEquals(_history.Current, path))
+            case NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback or NavOrigin.Tab:
+                if (!PathUtil.PathEquals(ActiveTab.History.Current, path))
                 {
-                    _history.ReplaceCurrent(path);
+                    ActiveTab.History.ReplaceCurrent(path);
                 }
 
                 break;
             case NavOrigin.Refresh:
                 break;
             default:
-                _history.Navigate(path);
+                ActiveTab.History.Navigate(path);
                 break;
         }
 
@@ -966,6 +981,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
 
         IsThisPc = false;
         CurrentPath = path;
+        ActiveTab.Location = path;
         PathText = path;
         PathError = false;
         FolderError = null;
@@ -993,22 +1009,23 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         Items.Clear();
         switch (origin)
         {
-            case NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback:
-                if (!PathUtil.IsThisPc(_history.Current))
+            case NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback or NavOrigin.Tab:
+                if (!PathUtil.IsThisPc(ActiveTab.History.Current))
                 {
-                    _history.ReplaceCurrent(PathUtil.ThisPc);
+                    ActiveTab.History.ReplaceCurrent(PathUtil.ThisPc);
                 }
 
                 break;
             case NavOrigin.Refresh:
                 break;
             default:
-                _history.Navigate(PathUtil.ThisPc);
+                ActiveTab.History.Navigate(PathUtil.ThisPc);
                 break;
         }
 
         IsThisPc = true;
         CurrentPath = null;
+        ActiveTab.Location = PathUtil.ThisPc;
         PathText = LocationText ?? string.Empty;
         PathError = false;
         FolderError = null;
