@@ -113,10 +113,6 @@ public sealed record PaneState(
     /// <summary>A pane with no path, Details view, name ascending, tree shown.</summary>
     public static PaneState Default { get; } = new(string.Empty, ViewMode.Details, SortState.Default, true, 240, 48, ColumnWidths.Default, []);
 
-    /// <summary>The tabs to show: <see cref="Tabs"/>, or one tab (colour 0) from the top-level values when there are none.</summary>
-    /// <returns>A non-empty list; with null <see cref="Tabs"/> the active index is 0.</returns>
-    public IReadOnlyList<TabState> TabsOrSingle() => Tabs is { Count: > 0 } tabs ? tabs : [new TabState(Path, ViewMode, Sort, 0)];
-
     internal PaneState Normalize(ICollection<string> fixes, string owner)
     {
         IReadOnlyList<string> history = PathHistoryList.Normalize(PathHistory);
@@ -151,11 +147,16 @@ public sealed record PaneState(
         }
 
         var tabs = new List<TabState>();
+        int activeTab = ActiveTab;
         foreach (TabState? tab in Tabs)
         {
             if (tab is null)
             {
                 fixes.Add(owner + ".tabs: removed a null entry");
+                if (tabs.Count < activeTab)
+                {
+                    activeTab--; // the index keeps pointing at the same tab
+                }
             }
             else if (tabs.Count == MaxTabs)
             {
@@ -174,7 +175,7 @@ public sealed record PaneState(
             return ([shown], 0);
         }
 
-        int active = Fixes.Check(fixes, owner + ".activeTab", ActiveTab, ActiveTab >= 0 && ActiveTab < tabs.Count, 0);
+        int active = Fixes.Check(fixes, owner + ".activeTab", activeTab, activeTab >= 0 && activeTab < tabs.Count, 0);
         var kept = new bool[tabs.Count];
         var used = new HashSet<int>();
         for (int i = 0; i < tabs.Count; i++)
@@ -200,8 +201,10 @@ public sealed record PaneState(
                 continue;
             }
 
+            // A background "" (a tab left before its first folder loaded) opens This PC; only null is a repair worth a warning.
+            string path = Fixes.Check(fixes, tabOwner + ".path", tab.Path, tab.Path is not null, PathUtil.ThisPc);
             tabs[i] = new TabState(
-                Fixes.Check(fixes, tabOwner + ".path", tab.Path, !string.IsNullOrEmpty(tab.Path), PathUtil.ThisPc),
+                path.Length > 0 ? path : PathUtil.ThisPc,
                 Fixes.Check(fixes, tabOwner + ".viewMode", tab.ViewMode, Enum.IsDefined(tab.ViewMode), Default.ViewMode),
                 SortState.Normalize(tab.Sort, fixes, tabOwner),
                 color);

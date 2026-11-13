@@ -39,13 +39,16 @@ public sealed partial class PaneViewModel
             throw new ArgumentException("The tab does not belong to this pane.", nameof(tab));
         }
 
-        PaneTab outgoing = ActiveTab;
-        if (Tabs.Contains(outgoing))
-        {
-            outgoing.ViewMode = ViewMode;
-            outgoing.Sort = new SortState(SortColumn, SortDescending);
-        }
+        ActiveTab.ViewMode = ViewMode;
+        ActiveTab.Sort = new SortState(SortColumn, SortDescending);
 
+        // Until the tab's folder commits the pane shows nothing (as before a first navigation), so nothing can read the
+        // outgoing tab's folder as this tab's: session capture, Up, Refresh/Retry, Gone, a hide and re-show (review C1).
+        StopShowingFolder();
+        IsThisPc = false;
+        CurrentPath = null;
+        FolderError = null;
+        PathError = false;
         SetActiveTab(tab);
         ViewMode = tab.ViewMode;
         SortColumn = tab.Sort.Column;
@@ -74,7 +77,7 @@ public sealed partial class PaneViewModel
         }
 
         return source == ActiveTab
-            ? InsertTab(index + 1, IsThisPc ? PathUtil.ThisPc : CurrentPath ?? source.Location, ViewMode, new SortState(SortColumn, SortDescending))
+            ? InsertTab(index + 1, ShownLocation, ViewMode, new SortState(SortColumn, SortDescending))
             : InsertTab(index + 1, source.Location, source.ViewMode, source.Sort);
     }
 
@@ -88,12 +91,14 @@ public sealed partial class PaneViewModel
             return;
         }
 
-        Tabs.RemoveAt(index);
-        NotifyTabs();
+        // Activate first: observers of the list change must never see an active tab outside Tabs (review m1).
         if (tab == ActiveTab)
         {
-            _ = ActivateTabAsync(Tabs[Math.Min(index, Tabs.Count - 1)]);
+            _ = ActivateTabAsync(Tabs[index + 1 < Tabs.Count ? index + 1 : index - 1]);
         }
+
+        Tabs.RemoveAt(index);
+        NotifyTabs();
     }
 
     /// <summary>Closes every tab but <paramref name="keep"/>, which becomes the active tab.</summary>
@@ -105,6 +110,11 @@ public sealed partial class PaneViewModel
             return;
         }
 
+        if (keep != ActiveTab)
+        {
+            _ = ActivateTabAsync(keep);
+        }
+
         for (int i = Tabs.Count - 1; i >= 0; i--)
         {
             if (Tabs[i] != keep)
@@ -114,10 +124,6 @@ public sealed partial class PaneViewModel
         }
 
         NotifyTabs();
-        if (keep != ActiveTab)
-        {
-            _ = ActivateTabAsync(keep);
-        }
     }
 
     /// <summary>Moves a tab within the strip (drag reorder); no navigation.</summary>
@@ -136,6 +142,9 @@ public sealed partial class PaneViewModel
     /// <summary>A layout change removed the pane: it keeps only its active tab (owner decision; no navigation).</summary>
     public void DiscardBackgroundTabs() => CloseOtherTabs(ActiveTab);
 
+    // The active tab's location as saved and duplicated: its own target while its folder is still loading.
+    private string ShownLocation => IsThisPc ? PathUtil.ThisPc : CurrentPath ?? ActiveTab.Location;
+
     private static Task<NavigationResult> Failed() => Task.FromResult(new NavigationResult(NavigationOutcome.Failed));
 
     private Task<NavigationResult> InsertTab(int index, string location, ViewMode viewMode, SortState sort)
@@ -150,9 +159,8 @@ public sealed partial class PaneViewModel
     // Restore: the saved tabs with empty histories; the caller then applies the top-level values and navigates.
     private void ResetTabs(PaneState state)
     {
-        IReadOnlyList<TabState> saved = state.TabsOrSingle();
         Tabs.Clear();
-        foreach (TabState tab in saved)
+        foreach (TabState tab in state.Tabs!)
         {
             Tabs.Add(new PaneTab(tab.Color, tab.Path, tab.ViewMode, tab.Sort));
         }

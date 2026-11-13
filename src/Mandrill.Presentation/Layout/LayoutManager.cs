@@ -352,10 +352,15 @@ public sealed class LayoutManager
                 return pane.RestoreAsync(NewPaneState(activePath ?? string.Empty, n), fallbackToAncestor: true);
             }
 
-            // Shown before, but hiding cancelled its first navigation: keep its view state, open the active pane's folder.
-            return pane.CurrentPath is null && !pane.IsThisPc
-                ? pane.RestoreAsync(pane.ToState() with { Path = activePath ?? string.Empty, Tabs = null }, fallbackToAncestor: true)
-                : null;
+            // Shown before, but hiding cancelled its first navigation or a tab switch: keep its view state and open the tab's
+            // own location, else (a first navigation never got one) the active pane's folder.
+            if (pane.CurrentPath is not null || pane.IsThisPc)
+            {
+                return null;
+            }
+
+            PaneState state = pane.ToState();
+            return pane.RestoreAsync(state with { Path = state.Path.Length > 0 ? state.Path : activePath ?? string.Empty, Tabs = null }, fallbackToAncestor: true);
         });
 
         Current = id;

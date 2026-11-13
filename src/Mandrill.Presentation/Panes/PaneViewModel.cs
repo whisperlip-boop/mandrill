@@ -226,7 +226,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     public Task<NavigationResult> RestoreAsync(PaneState state, bool fallbackToAncestor)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (state.Tabs is not null)
+        if (state.Tabs is { Count: > 0 })
         {
             ResetTabs(state);
         }
@@ -250,7 +250,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     /// <returns>The state.</returns>
     public PaneState ToState()
     {
-        var shown = new TabState(IsThisPc ? PathUtil.ThisPc : CurrentPath ?? string.Empty, ViewMode, new SortState(SortColumn, SortDescending), ActiveTab.Color);
+        var shown = new TabState(ShownLocation, ViewMode, new SortState(SortColumn, SortDescending), ActiveTab.Color);
         return new(
             shown.Path,
             shown.ViewMode,
@@ -998,15 +998,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     // list (DriveListViewModel) loads on ThisPcShown. The path-box history never gets the token.
     private NavigationResult ShowThisPc(NavOrigin origin, PaneStatus? status, string? select)
     {
-        Supersede();
-        _request = null;
-        _scanner.Cancel();
-        _pendingSelect = null;
-        _dirtyWhileLoading = false;
-        _resortWhenDone = false;
-        _reconcileIfKept = false;
-        Unsubscribe();
-        Items.Clear();
+        StopShowingFolder();
         switch (origin)
         {
             case NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback or NavOrigin.Tab:
@@ -1034,6 +1026,20 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         NotifyHistory();
         ThisPcShown?.Invoke(select);
         return new NavigationResult(NavigationOutcome.Committed, PathUtil.ThisPc);
+    }
+
+    // Drops the shown folder's request, watch and listing (This PC, and a tab switch before it navigates).
+    private void StopShowingFolder()
+    {
+        Supersede();
+        _request = null;
+        _scanner.Cancel();
+        _pendingSelect = null;
+        _dirtyWhileLoading = false;
+        _resortWhenDone = false;
+        _reconcileIfKept = false;
+        Unsubscribe();
+        Items.Clear();
     }
 
     // The pane stayed on its folder after a failed navigation: catch up on an update that navigation superseded.

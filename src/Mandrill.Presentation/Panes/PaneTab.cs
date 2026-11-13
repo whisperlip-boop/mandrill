@@ -26,7 +26,7 @@ public sealed partial class PaneTab : ObservableObject
     /// <summary>Committed folder, <see cref="PathUtil.ThisPc"/>, or "" (the home folder, opened on activation).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Title), nameof(ToolTip))]
-    public partial string Location { get; internal set; } = string.Empty;
+    public partial string Location { get; internal set; }
 
     /// <summary>Whether this is the pane's shown tab.</summary>
     [ObservableProperty]
