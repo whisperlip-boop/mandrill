@@ -32,6 +32,7 @@ public sealed partial class PaneTabItem : ContentControl
     private const double Radius = 6;
     private const double TextLeft = Slant + 6;
     private const double CloseReserve = 24;
+    private const double NarrowWidth = 120;
 
     private readonly PaneTabStrip _strip;
     private readonly Path _hit = new() { Fill = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
@@ -40,6 +41,7 @@ public sealed partial class PaneTabItem : ContentControl
     private readonly Path _ringInner = new() { IsHitTestVisible = false, StrokeThickness = 1, Visibility = Visibility.Collapsed };
     private readonly TextBlock _text = new() { TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _close;
+    private readonly Grid _band;
     private readonly IconElement _closeGlyph;
     private bool _hover;
     private bool _pressed;
@@ -78,12 +80,12 @@ public sealed partial class PaneTabItem : ContentControl
         _close.Click += (_, _) => _strip.Close(this);
 
         // The text band is y 2…22, so its centre (y 12) does not move when the tab grows to 22 px on activation.
-        var band = new Grid { Margin = new Thickness(TextLeft, InactiveTop, CloseReserve, 0), Height = BandHeight - InactiveTop, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false };
-        band.Children.Add(_text);
+        _band = new Grid { Margin = new Thickness(TextLeft, InactiveTop, CloseReserve, 0), Height = BandHeight - InactiveTop, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false };
+        _band.Children.Add(_text);
         var root = new Grid();
         root.Children.Add(_hit);
         root.Children.Add(_shape);
-        root.Children.Add(band);
+        root.Children.Add(_band);
         root.Children.Add(_ringOuter);
         root.Children.Add(_ringInner);
         root.Children.Add(_close);
@@ -91,6 +93,7 @@ public sealed partial class PaneTabItem : ContentControl
 
         PointerEntered += (_, _) => SetPointer(hover: true, _pressed);
         PointerExited += (_, _) => SetPointer(hover: false, pressed: false);
+        RenderTransform = Shift; // drag: the dragged tab follows the pointer, its neighbours slide aside
         PointerPressed += OnPointerPressed;
         PointerReleased += (_, _) => SetPointer(_hover, pressed: false);
         PointerCaptureLost += (_, _) => SetPointer(_hover, pressed: false);
@@ -114,6 +117,12 @@ public sealed partial class PaneTabItem : ContentControl
     public double ShapeTop => _shapeTop;
 
     internal TabVisualState VisualState => _pressed ? TabVisualState.Pressed : _hover ? TabVisualState.Hover : TabVisualState.Rest;
+
+    /// <summary>Horizontal offset from the tab's slot while a drag is in progress.</summary>
+    internal TranslateTransform Shift { get; } = new();
+
+    /// <summary>Whether this tab is being dragged (2 px edge).</summary>
+    internal bool IsDragging { get; set; }
 
     /// <summary>Stops following the tab (the strip removed it).</summary>
     internal void Detach() => Tab.PropertyChanged -= OnTabChanged;
@@ -145,6 +154,8 @@ public sealed partial class PaneTabItem : ContentControl
         _text.Foreground = look.Text;
         _closeGlyph.Foreground = look.Text;
         _close.Foreground = look.Text;
+        _close.Background = look.Fill; // narrow tabs: the x covers the text end on a solid tab fill
+        _band.Margin = new Thickness(TextLeft, InactiveTop, width >= NarrowWidth ? CloseReserve : 4, 0);
         _text.FontWeight = new Windows.UI.Text.FontWeight(Tab.IsActive ? (ushort)700 : (ushort)400); // FontWeights statics are not activatable unpackaged (measured)
 
         bool keyboardFocus = FocusState == FocusState.Keyboard;
@@ -192,8 +203,7 @@ public sealed partial class PaneTabItem : ContentControl
         var point = e.GetCurrentPoint(this);
         if (point.Properties.IsLeftButtonPressed)
         {
-            SetPointer(_hover, pressed: true);
-            _strip.OnTabPressed(this); // activation on press (ui-spec §2a)
+            SetPointer(_hover, pressed: true); // the strip activates on press and may start a drag
         }
     }
 

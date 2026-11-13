@@ -25,10 +25,8 @@
             Height="2"
             VerticalAlignment="Bottom"
             IsHitTestVisible="False" />
-        <Canvas
-            x:Name="TabHost"
-            Margin="4,0,0,0"
-            HorizontalAlignment="Left" />
+        <!--  "<" ">" "…" (overflow only), the clipped tab viewport, "+": placed in code (ui-spec §2a width sharing).  -->
+        <Canvas x:Name="RowCanvas" Margin="4,0,0,0" />
         <Border x:Name="RowBackgroundSwatch" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed" />
         <Border x:Name="EdgeSwatch" Background="{ThemeResource MandrillTabEdgeBrush}" Visibility="Collapsed" />
         <Border

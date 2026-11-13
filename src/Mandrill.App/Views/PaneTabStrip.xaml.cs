@@ -10,32 +10,50 @@ using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using Windows.System;
 using Windows.UI;
+using Windows.UI.ViewManagement;
 
 namespace Mandrill.App.Views;
 
 /// <summary>
 /// A pane's tab row (ui-spec §2a, architecture §17.5, ADR-0017): one <see cref="PaneTabItem"/> per <see cref="PaneViewModel.Tabs"/>
-/// entry, overlapping by 16 px (left in front, active on top), "+" after the last tab, the 2 px strip, a shared context
-/// menu, roving keyboard focus and UIA Tab/TabItem peers. Tab state lives in the view model; this only mirrors it.
+/// entry, overlapping by 16 px (left in front, active on top), shrinking 160 → 96 px and then overflowing with "&lt;" "&gt;"
+/// "…" and a pinned "+", the 2 px strip, a shared context menu, roving keyboard focus, drag reorder within the pane and UIA
+/// Tab/TabItem peers. Tab state lives in the view model; this only mirrors it.
 /// </summary>
 public sealed partial class PaneTabStrip : UserControl
 {
-    /// <summary>Tab width (bounding box) before T4's shrink and overflow.</summary>
-    public const double TabWidth = 160;
+    /// <summary>Movement before a press becomes a drag (fixed: Win32 metrics are not used in the App, ui-spec §2a).</summary>
+    public const double DragThreshold = 4;
 
-    /// <summary>Overlap of neighbouring tabs (2 × slant).</summary>
-    public const double Overlap = 2 * PaneTabItem.Slant;
+    private const double ChevronWidth = 20;
+    private const double MoreWidth = 16;
+    private const double EdgeScrollZone = 24;
+    private const double EdgeScrollStep = 8;
+    private static readonly UISettings Settings = new();
 
     private readonly Dictionary<PaneTab, PaneTabItem> _byTab = [];
+    private readonly Dictionary<TranslateTransform, (Storyboard Board, double To)> _animations = [];
     private readonly List<PaneTabItem> _items = [];
     private readonly MenuFlyout _menu = new();
+    private readonly Canvas _viewport = new() { Height = 24 };
+    private readonly Canvas _track = new() { Height = 24 };
+    private readonly TranslateTransform _scroll = new();
+    private readonly Button _left;
+    private readonly Button _right;
+    private readonly Border _more = new() { Width = MoreWidth, Height = 24, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
+    private readonly Border _plusHost = new() { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
     private readonly Button _plus = new() { Width = 24, Height = 24, Padding = new Thickness(6), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0) };
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _edgeScroll;
     private PaneViewModel? _vm;
-    private IconProvider? _icons;
     private PaneTabItem? _roving;
     private PaneTabItem? _active;
+    private IconProvider? _icons;
+    private TabStripLayout _layout = TabStripLayout.Compute(0, 1);
+    private Press? _press;
+    private double _offset;
     private bool _menuFilled;
     private bool _isPaneActive = true;
     private double _reservedRight;
@@ -44,10 +62,27 @@ public sealed partial class PaneTabStrip : UserControl
     public PaneTabStrip()
     {
         InitializeComponent();
-        AppTheme.Track(Resources); // SubtleButtons.xaml scope ("+")
-        TabHost.Children.Add(_plus);
+        AppTheme.Track(Resources); // SubtleButtons.xaml scope ("+", chevrons)
+        _left = Chevron("", "pane.tab.scrollLeft", -1);
+        _right = Chevron("", "pane.tab.scrollRight", 1);
+        _more.Child = IconProvider.CreateGlyph(IconProvider.MoreGlyph, 12);
+        ToolTipService.SetToolTip(_more, Localizer.Current["pane.tab.hidden"]);
+        AutomationProperties.SetAccessibilityView(_more, AccessibilityView.Raw);
+
+        // A disabled control raises no pointer events, so its own tooltip never opens: the limit tooltip sits on a host.
+        _plusHost.Child = _plus;
+        _track.RenderTransform = _scroll;
+        _viewport.Children.Add(_track);
+        RowCanvas.Children.Add(_left);
+        RowCanvas.Children.Add(_right);
+        RowCanvas.Children.Add(_more);
+        RowCanvas.Children.Add(_viewport);
+        RowCanvas.Children.Add(_plusHost);
         _plus.Click += OnPlusClick;
         _menu.Opening += OnMenuOpening;
+        _edgeScroll = DispatcherQueue.CreateTimer();
+        _edgeScroll.Interval = TimeSpan.FromMilliseconds(16);
+        _edgeScroll.Tick += (_, _) => EdgeScrollTick();
         SizeChanged += (_, _) => Arrange();
         ActualThemeChanged += (_, _) => RefreshAll();
     }
@@ -86,6 +121,18 @@ public sealed partial class PaneTabStrip : UserControl
     /// <summary>The "+" button (tests).</summary>
     public Button NewTabButton => _plus;
 
+    /// <summary>The tooltip shown over "+": New tab, or the limit message when disabled (tests).</summary>
+    public object NewTabToolTip => ToolTipService.GetToolTip(_plusHost);
+
+    /// <summary>The scroll buttons (tests).</summary>
+    public (Button Left, Button Right) ScrollButtons => (_left, _right);
+
+    /// <summary>The current width sharing (tests).</summary>
+    public TabStripLayout Layout => _layout;
+
+    /// <summary>Horizontal scroll offset of the tabs in overflow (tests).</summary>
+    public double ScrollOffset => _offset;
+
     /// <summary>The shared tab context menu (tests).</summary>
     public MenuFlyout TabMenu => _menu;
 
@@ -120,6 +167,125 @@ public sealed partial class PaneTabStrip : UserControl
         Sync();
     }
 
+    /// <summary>Left button pressed on a tab at <paramref name="x"/> (row coordinates): activates it; may become a drag.</summary>
+    /// <param name="item">The tab.</param>
+    /// <param name="x">Pointer x in the row.</param>
+    public void PressTab(PaneTabItem item, double x)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        CancelDrag();
+        Activate(item);
+        _press = new Press(item, x, _items.IndexOf(item)) { StartOffset = _offset };
+    }
+
+    /// <summary>The pointer moved while pressed: past <see cref="DragThreshold"/> the tab follows it and the others slide aside.</summary>
+    /// <param name="x">Pointer x in the row.</param>
+    public void DragTo(double x)
+    {
+        if (_press is not { } press)
+        {
+            return;
+        }
+
+        press.LastX = x;
+        double dx = x - press.StartX;
+        if (!press.Dragging)
+        {
+            if (Math.Abs(dx) < DragThreshold)
+            {
+                return;
+            }
+
+            press.Dragging = true;
+            press.Item.IsDragging = true;
+            Canvas.SetZIndex(press.Item, _items.Count + 2); // raised to the top
+            SetRoving(press.Item);
+            press.Item.Focus(FocusState.Pointer); // Esc reaches the tab
+            press.Item.Refresh();
+        }
+
+        double slot = press.From * _layout.Pitch;
+        double left = Math.Clamp(slot + dx + (_offset - press.StartOffset), _offset, Math.Max(_offset, _offset + _layout.Viewport - _layout.TabWidth));
+        SetShift(press.Item.Shift, left - slot);
+        press.Target = Math.Clamp((int)Math.Round(left / _layout.Pitch), 0, _items.Count - 1);
+        for (int i = 0; i < _items.Count; i++)
+        {
+            if (i != press.From)
+            {
+                double shift = press.From < press.Target && i > press.From && i <= press.Target ? -_layout.Pitch
+                    : press.Target < press.From && i >= press.Target && i < press.From ? _layout.Pitch
+                    : 0;
+                Animate(_items[i].Shift, shift, 120);
+            }
+        }
+
+        double inView = x - _viewport.ActualOffset.X;
+        bool nearEdge = _layout.Overflow && (inView < EdgeScrollZone || inView > _layout.Viewport - EdgeScrollZone);
+        if (nearEdge && !_edgeScroll.IsRunning)
+        {
+            _edgeScroll.Start();
+        }
+        else if (!nearEdge)
+        {
+            _edgeScroll.Stop();
+        }
+    }
+
+    /// <summary>The press ended: a drag moves the tab once (<see cref="PaneViewModel.MoveTab"/>); a click only activated it.</summary>
+    public void ReleaseTab()
+    {
+        if (_press is not { } press)
+        {
+            return;
+        }
+
+        EndPress(press);
+        if (press.Dragging && _vm is not null)
+        {
+            double visual = (press.From * _layout.Pitch) + press.Item.Shift.X;
+            foreach (PaneTabItem item in _items)
+            {
+                SetShift(item.Shift, 0); // their slots after the move are where they were shown
+            }
+
+            if (press.Target != press.From)
+            {
+                _vm.MoveTab(press.From, press.Target);
+            }
+
+            SetShift(press.Item.Shift, visual - (press.Target * _layout.Pitch));
+            Animate(press.Item.Shift, 0, 100); // snaps into the gap
+        }
+
+        ListFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Esc or a lost capture during a drag: the old order comes back.</summary>
+    public void CancelDrag()
+    {
+        if (_press is not { } press)
+        {
+            return;
+        }
+
+        EndPress(press);
+        foreach (PaneTabItem item in _items)
+        {
+            Animate(item.Shift, 0, 100);
+        }
+    }
+
+    /// <summary>Left/Right/Home/End: moves the keyboard focus (the roving Tab stop) to a tab without activating it.</summary>
+    /// <param name="item">The tab.</param>
+    /// <returns>Whether the tab got the focus.</returns>
+    public bool FocusTab(PaneTabItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        SetRoving(item);
+        BringIntoView(item);
+        return item.Focus(FocusState.Keyboard);
+    }
+
     internal int IndexOf(PaneTabItem item) => _items.IndexOf(item);
 
     /// <summary>Activates a tab (UIA Select, Enter/Space): keeps the focus where it is.</summary>
@@ -127,15 +293,14 @@ public sealed partial class PaneTabStrip : UserControl
 
     internal void Close(PaneTabItem item) => _vm?.CloseTab(item.Tab);
 
-    internal void OnTabPressed(PaneTabItem item)
-    {
-        Activate(item);
-        ListFocusRequested?.Invoke(this, EventArgs.Empty);
-    }
-
     internal void OnTabFocused(PaneTabItem item)
     {
         SetRoving(item);
+        if (item.FocusState == FocusState.Keyboard)
+        {
+            BringIntoView(item);
+        }
+
         item.Refresh();
     }
 
@@ -150,7 +315,7 @@ public sealed partial class PaneTabStrip : UserControl
             bool highlighted = active && _isPaneActive;
             Brush fill = highlighted ? HcActiveSwatch.Background : HcSwatch.Background;
             Brush text = highlighted ? HcActiveSwatch.BorderBrush : HcSwatch.BorderBrush;
-            return item.VisualState != TabVisualState.Rest
+            return item.VisualState != TabVisualState.Rest || item.IsDragging
                 ? new TabLook(fill, text, HcHoverSwatch.Background, 2, focusOuter, focusInner) // HC pressed = HC hover
                 : new TabLook(fill, text, HcSwatch.BorderBrush, active && !_isPaneActive ? 2 : 1, focusOuter, focusInner);
         }
@@ -160,13 +325,72 @@ public sealed partial class PaneTabStrip : UserControl
             new SolidColorBrush(fillColor),
             new SolidColorBrush(TabPalette.Text(item.Tab.Color, fillColor, _isPaneActive)),
             EdgeSwatch.Background,
-            1,
+            item.IsDragging ? 2 : 1,
             focusOuter,
             focusInner);
     }
 
     /// <inheritdoc/>
     protected override AutomationPeer OnCreateAutomationPeer() => new PaneTabStripAutomationPeer(this);
+
+    // One animation per transform: a new target or a direct set replaces the running one (else it would win on completion).
+    private void Animate(TranslateTransform target, double to, int milliseconds)
+    {
+        if (_animations.TryGetValue(target, out var running) ? running.To == to : target.X == to)
+        {
+            return;
+        }
+
+        SetShift(target, target.X);
+        var animation = new DoubleAnimation
+        {
+            To = to,
+            Duration = TimeSpan.FromMilliseconds(Settings.AnimationsEnabled ? milliseconds : 0),
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+        };
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, nameof(TranslateTransform.X));
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        storyboard.Completed += (_, _) =>
+        {
+            if (_animations.TryGetValue(target, out var current) && current.Board == storyboard)
+            {
+                SetShift(target, to);
+            }
+        };
+        _animations[target] = (storyboard, to);
+        storyboard.Begin();
+    }
+
+    // Stops a running animation of the transform, then sets its value.
+    private void SetShift(TranslateTransform target, double x)
+    {
+        if (_animations.Remove(target, out var running))
+        {
+            running.Board.Stop();
+        }
+
+        target.X = x;
+    }
+
+    private Button Chevron(string glyph, string key, int direction)
+    {
+        var button = new Button
+        {
+            Width = ChevronWidth,
+            Height = 24,
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            BorderThickness = new Thickness(0),
+            Content = IconProvider.CreateGlyph(glyph, 10),
+            Visibility = Visibility.Collapsed,
+        };
+        ToolTipService.SetToolTip(button, Localizer.Current[key]);
+        AutomationProperties.SetName(button, Localizer.Current[key]);
+        button.Click += (_, _) => ScrollTo(_offset + (direction * _layout.Pitch)); // one pitch: the next hidden tab
+        return button;
+    }
 
     private void OnTabsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Sync();
 
@@ -180,6 +404,11 @@ public sealed partial class PaneTabStrip : UserControl
                 RefreshAll();
                 RaiseSelected(ActiveItem, _active);
                 _active = ActiveItem;
+                if (_active is not null)
+                {
+                    BringIntoView(_active); // activation, creation and duplication
+                }
+
                 break;
             case nameof(PaneViewModel.CanAddTab):
                 ApplyCanAdd();
@@ -198,13 +427,14 @@ public sealed partial class PaneTabStrip : UserControl
             return;
         }
 
+        CancelDrag();
         bool focusInRow = HasFocusWithin();
         var keep = new HashSet<PaneTab>(_vm.Tabs);
         foreach (PaneTabItem gone in _items.Where(i => !keep.Contains(i.Tab)).ToList())
         {
             gone.Detach();
             _byTab.Remove(gone.Tab);
-            TabHost.Children.Remove(gone);
+            _track.Children.Remove(gone);
         }
 
         _items.Clear();
@@ -212,10 +442,14 @@ public sealed partial class PaneTabStrip : UserControl
         {
             if (!_byTab.TryGetValue(tab, out PaneTabItem? item))
             {
-                item = new PaneTabItem(tab, this, _icons) { Width = TabWidth, ContextFlyout = _menu };
+                item = new PaneTabItem(tab, this, _icons) { ContextFlyout = _menu };
                 item.KeyDown += OnTabKeyDown;
+                item.PointerPressed += OnTabPointerPressed;
+                item.PointerMoved += OnTabPointerMoved;
+                item.PointerReleased += OnTabPointerReleased;
+                item.PointerCaptureLost += OnTabCaptureLost;
                 _byTab[tab] = item;
-                TabHost.Children.Insert(TabHost.Children.Count - 1, item); // before "+": tabs come first in Tab order
+                _track.Children.Add(item);
             }
 
             _items.Add(item);
@@ -228,28 +462,96 @@ public sealed partial class PaneTabStrip : UserControl
         RefreshAll();
         if (focusInRow && !HasFocusWithin())
         {
-            // The focused tab was closed: once the close has activated its neighbour, focus that (ui-spec §2a).
+            // The focused tab was closed: focus the tab the close activated (ui-spec §2a).
             DispatcherQueue.TryEnqueue(() => ActiveItem?.Focus(FocusState.Keyboard));
         }
     }
 
-    // T3: fixed 160 px tabs at pitch 144, clipped before the view buttons (T4 adds shrink and overflow).
+    // ui-spec §2a width sharing. A is measured without the chevrons, so entering and leaving overflow never flickers.
     private void Arrange()
     {
-        double pitch = TabWidth - Overlap;
         int n = _items.Count;
+        double available = ActualWidth - RowCanvas.Margin.Left - _reservedRight - TabStripLayout.PlusSlot;
+        _layout = TabStripLayout.Compute(available, n);
+        bool overflow = _layout.Overflow;
+        _left.Visibility = _right.Visibility = _more.Visibility = overflow ? Visibility.Visible : Visibility.Collapsed;
+        Canvas.SetLeft(_right, ChevronWidth);
+        Canvas.SetLeft(_more, 2 * ChevronWidth);
+        double viewportLeft = overflow ? TabStripLayout.OverflowSlot : 0;
+        Canvas.SetLeft(_viewport, viewportLeft);
+        _viewport.Width = _layout.Viewport;
+        _viewport.Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, _layout.Viewport, 24) };
+        Canvas.SetLeft(_plusHost, viewportLeft + _layout.Viewport + 4); // pinned after the viewport: it never scrolls
         for (int i = 0; i < n; i++)
         {
             PaneTabItem item = _items[i];
-            Canvas.SetLeft(item, i * pitch);
+            item.Width = _layout.TabWidth;
+            Canvas.SetLeft(item, i * _layout.Pitch);
             Canvas.SetZIndex(item, item.Tab.IsActive ? n + 1 : n - i);
         }
 
-        Canvas.SetLeft(_plus, n == 0 ? 0 : ((n - 1) * pitch) + TabWidth + 4);
-        double width = Math.Max(0, ActualWidth - TabHost.Margin.Left - _reservedRight);
-        TabHost.Width = width;
-        TabHost.Height = Height;
-        TabHost.Clip = new RectangleGeometry { Rect = new Windows.Foundation.Rect(0, 0, width, Height) };
+        ScrollTo(_offset, animate: false);
+    }
+
+    private void ScrollTo(double offset, bool animate = true)
+    {
+        double max = Math.Max(0, _layout.ContentWidth(_items.Count) - _layout.Viewport);
+        _offset = _layout.Overflow ? Math.Clamp(offset, 0, max) : 0;
+        if (animate)
+        {
+            Animate(_scroll, -_offset, 120);
+        }
+        else
+        {
+            SetShift(_scroll, -_offset);
+        }
+
+        _left.IsEnabled = _offset > 0.5;
+        _right.IsEnabled = _offset < max - 0.5;
+    }
+
+    private void BringIntoView(PaneTabItem item)
+    {
+        int index = _items.IndexOf(item);
+        if (!_layout.Overflow || index < 0)
+        {
+            return;
+        }
+
+        double left = index * _layout.Pitch;
+        double right = left + _layout.TabWidth;
+        if (left < _offset)
+        {
+            ScrollTo(left);
+        }
+        else if (right > _offset + _layout.Viewport)
+        {
+            ScrollTo(right - _layout.Viewport);
+        }
+    }
+
+    // Overflow drag near the viewport edge: 8 px per 16 ms (ui-spec §2a).
+    private void EdgeScrollTick()
+    {
+        if (_press is not { Dragging: true } press)
+        {
+            _edgeScroll.Stop();
+            return;
+        }
+
+        double inView = press.LastX - _viewport.ActualOffset.X;
+        ScrollTo(_offset + (inView < EdgeScrollZone ? -EdgeScrollStep : EdgeScrollStep), animate: false);
+        DragTo(press.LastX);
+    }
+
+    private void EndPress(Press press)
+    {
+        _press = null;
+        _edgeScroll.Stop();
+        press.Item.IsDragging = false;
+        press.Item.ReleasePointerCaptures();
+        Arrange(); // z-order back
+        press.Item.Refresh();
     }
 
     private void RefreshAll()
@@ -273,8 +575,7 @@ public sealed partial class PaneTabStrip : UserControl
     {
         bool canAdd = _vm?.CanAddTab == true;
         _plus.IsEnabled = canAdd;
-        string tip = Localizer.Current[canAdd ? "pane.tab.new" : "pane.tab.limitReached"];
-        ToolTipService.SetToolTip(_plus, tip);
+        ToolTipService.SetToolTip(_plusHost, Localizer.Current[canAdd ? "pane.tab.new" : "pane.tab.limitReached"]);
         AutomationProperties.SetName(_plus, Localizer.Current["pane.tab.new"]);
         AutomationProperties.SetHelpText(_plus, canAdd ? string.Empty : Localizer.Current["pane.tab.limitReached"]);
     }
@@ -289,9 +590,56 @@ public sealed partial class PaneTabStrip : UserControl
         }
     }
 
+    private void OnTabPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            var item = (PaneTabItem)sender;
+            PressTab(item, e.GetCurrentPoint(RowCanvas).Position.X);
+            item.CapturePointer(e.Pointer);
+        }
+    }
+
+    private void OnTabPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_press is not null)
+        {
+            DragTo(e.GetCurrentPoint(RowCanvas).Position.X);
+        }
+    }
+
+    private void OnTabPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_press is not null)
+        {
+            ReleaseTab();
+            e.Handled = true;
+        }
+    }
+
+    // A capture lost with the button up is the release itself (the order of the two events is not relied on).
+    private void OnTabCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            CancelDrag();
+        }
+        else
+        {
+            ReleaseTab();
+        }
+    }
+
     private void OnTabKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var item = (PaneTabItem)sender;
+        if (e.Key == VirtualKey.Escape && _press is { Dragging: true })
+        {
+            CancelDrag();
+            e.Handled = true;
+            return;
+        }
+
         int index = _items.IndexOf(item);
         int target = e.Key switch
         {
@@ -305,8 +653,7 @@ public sealed partial class PaneTabStrip : UserControl
         {
             if (target >= 0 && target < _items.Count && target != index)
             {
-                SetRoving(_items[target]);
-                _items[target].Focus(FocusState.Keyboard); // moves focus only; no wrap
+                FocusTab(_items[target]); // moves focus only; no wrap
             }
 
             e.Handled = true;
@@ -340,7 +687,7 @@ public sealed partial class PaneTabStrip : UserControl
     // Built when first opened (the pane View menu pattern); acts on the right-clicked tab, which it does not activate.
     private void OnMenuOpening(object? sender, object e)
     {
-        if (_vm is null || _menu.Target is not PaneTabItem target)
+        if (_vm is null || _menu.Target is not PaneTabItem)
         {
             return;
         }
@@ -421,5 +768,23 @@ public sealed partial class PaneTabStrip : UserControl
             peer.RaisePropertyChangedEvent(SelectionItemPatternIdentifiers.IsSelectedProperty, false, true);
             peer.RaiseAutomationEvent(AutomationEvents.SelectionItemPatternOnElementSelected);
         }
+    }
+
+    // One left-button press on a tab; becomes a drag past the threshold.
+    private sealed class Press(PaneTabItem item, double startX, int from)
+    {
+        public PaneTabItem Item { get; } = item;
+
+        public double StartX { get; } = startX;
+
+        public int From { get; } = from;
+
+        public double StartOffset { get; set; }
+
+        public double LastX { get; set; } = startX;
+
+        public int Target { get; set; } = from;
+
+        public bool Dragging { get; set; }
     }
 }
