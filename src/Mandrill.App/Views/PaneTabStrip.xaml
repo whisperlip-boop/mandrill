@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    The pane's tab row (ui-spec §2a, architecture §17.5): exactly 24 px, tabs in the band y 0…22 and the 2 px strip y 22…24
+    in the active tab's colour. The tabs and "+" are built in code (≤ 10). The swatches are never shown: they resolve the
+    theme brushes the code paints with (FileListView's swatch pattern), including the row background for the scrim.
+-->
+<UserControl
+    x:Class="Mandrill.App.Views.PaneTabStrip"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="using:Mandrill.App.Markup"
+    Height="24"
+    AutomationProperties.Name="{m:Tr Key=pane.tabs}">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Themes/SubtleButtons.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid>
+        <!--  Below every button of the row (declared first; the view buttons come later in PaneView) and not hit-testable.  -->
+        <Rectangle
+            x:Name="Strip"
+            Height="2"
+            VerticalAlignment="Bottom"
+            IsHitTestVisible="False" />
+        <Canvas
+            x:Name="TabHost"
+            Margin="4,0,0,0"
+            HorizontalAlignment="Left" />
+        <Border x:Name="RowBackgroundSwatch" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed" />
+        <Border x:Name="EdgeSwatch" Background="{ThemeResource MandrillTabEdgeBrush}" Visibility="Collapsed" />
+        <Border
+            x:Name="HcSwatch"
+            Background="{ThemeResource MandrillTabBackgroundBrush}"
+            BorderBrush="{ThemeResource MandrillTabForegroundBrush}"
+            Visibility="Collapsed" />
+        <Border
+            x:Name="HcActiveSwatch"
+            Background="{ThemeResource MandrillTabActiveBackgroundBrush}"
+            BorderBrush="{ThemeResource MandrillTabActiveForegroundBrush}"
+            Visibility="Collapsed" />
+        <Border x:Name="HcHoverSwatch" Background="{ThemeResource MandrillTabHoverBorderBrush}" Visibility="Collapsed" />
+        <Border
+            x:Name="FocusSwatch"
+            Background="{ThemeResource SystemControlFocusVisualPrimaryBrush}"
+            BorderBrush="{ThemeResource SystemControlFocusVisualSecondaryBrush}"
+            Visibility="Collapsed" />
+    </Grid>
+</UserControl>

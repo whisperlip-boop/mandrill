@@ -61,6 +61,8 @@ public sealed partial class PaneView : UserControl
         SizeChanged += (_, e) => ApplyOverflow(e.NewSize.Width);
         Body.SizeChanged += (_, e) => TreeColumn.MaxWidth = Math.Max(TreeMinWidth, e.NewSize.Width * 0.5);
         TreeHost.SizeChanged += OnTreeSized;
+        ViewModeButtons.SizeChanged += (_, e) => TabRow.ReservedRight = e.NewSize.Width + ViewModeButtons.Margin.Right + 8; // ≥ 8 px before the view buttons
+        TabRow.ListFocusRequested += (_, _) => FocusList();
 
         // Any click or focus inside the pane activates it (AC-1.4); handled events too (the list handles its clicks).
         AddHandler(PointerPressedEvent, new PointerEventHandler(OnPanePointerPressed), handledEventsToo: true);
@@ -129,6 +131,9 @@ public sealed partial class PaneView : UserControl
 
     /// <summary>The file list (tests, focus).</summary>
     public FileListView FileList => Files;
+
+    /// <summary>The tab row (tests).</summary>
+    public PaneTabStrip TabStrip => TabRow;
 
     /// <summary>
     /// Ctrl+F or the Search button: commits an open inline rename first (as Explorer does when another window takes over;
@@ -231,6 +236,7 @@ public sealed partial class PaneView : UserControl
         SetupViewToggle(DetailsViewButton, ViewChoices.Single(c => c.Key == "pane.view.details"));
         SetupViewToggle(LargeIconsViewButton, ViewChoices.Single(c => c.Key == "pane.view.largeIcons"));
 
+        TabRow.Attach(vm, icons);
         PathInput.Attach(vm, _logger);
         PathInput.ListFocusRequested += (_, _) => FocusList(); // QA S3-5: a typed This PC focuses the drive list
         void AttachList() => Files.Attach(vm, iconService, bitmaps, dispatcher, _logger);
@@ -565,6 +571,7 @@ public sealed partial class PaneView : UserControl
         ActiveFrame.BorderThickness = new Thickness(AppTheme.IsHighContrast() ? 2 : 1); // owner #12: 1 px; HC keeps 2 px
         Toolbar.Opacity = ViewModeButtons.Opacity = _isActive || AppTheme.IsHighContrast() ? 1.0 : 0.8;
         Files.IsActive = _isActive;
+        TabRow.IsPaneActive = _isActive; // the tabs use the designer's scrim, not the toolbar's 80 % opacity
     }
 
     // ADR-0015: the drive list replaces the file list; New folder, the view menu and the view buttons are off (FileListView keeps its state).

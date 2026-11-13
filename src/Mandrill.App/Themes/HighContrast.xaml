@@ -35,6 +35,12 @@
     <StaticResource x:Key="MandrillRubberBandFillBrush" ResourceKey="MandrillHcTransparentBrush" />
     <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="MandrillHcFocusBrush" />
     <StaticResource x:Key="MandrillMainInstructionBrush" ResourceKey="MandrillHcTextBrush" />
+    <StaticResource x:Key="MandrillTabEdgeBrush" ResourceKey="MandrillHcTextBrush" />
+    <StaticResource x:Key="MandrillTabBackgroundBrush" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="MandrillTabForegroundBrush" ResourceKey="MandrillHcTextBrush" />
+    <StaticResource x:Key="MandrillTabActiveBackgroundBrush" ResourceKey="MandrillHcHighlightBrush" />
+    <StaticResource x:Key="MandrillTabActiveForegroundBrush" ResourceKey="MandrillHcWindowBrush" />
+    <StaticResource x:Key="MandrillTabHoverBorderBrush" ResourceKey="MandrillHcHighlightBrush" />
 
     <!--  Themes/ExplorerItems.xaml and the list, grid and tree items  -->
     <StaticResource x:Key="MandrillContentBackgroundBrush" ResourceKey="MandrillHcWindowBrush" />

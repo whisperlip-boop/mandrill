@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
     App-level brush aliases. Only theme resources, no colour literals (AC-1.39, ADR-0014), except MandrillMainInstructionBrush:
-    Explorer's fixed main-instruction blue in the folder-access prompt (owner, stage 4); High contrast keeps the system text.
+    Explorer's fixed main-instruction blue in the folder-access prompt (owner, stage 4); High contrast keeps the system text;
+    and MandrillTabEdgeBrush, the owner-approved tab outline grey (ui-spec §2a). The tab palette itself is Views/TabPalette.cs.
 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -24,6 +25,13 @@
             <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="AccentFillColorDefaultBrush" />
             <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemFillColorCriticalBrush" />
             <SolidColorBrush x:Key="MandrillMainInstructionBrush" Color="#003399" />
+            <!--  Pane tabs (ui-spec §2a): the edge around every tab; the other five are used in high contrast only.  -->
+            <SolidColorBrush x:Key="MandrillTabEdgeBrush" Color="#8C8C8C" />
+            <StaticResource x:Key="MandrillTabBackgroundBrush" ResourceKey="SolidBackgroundFillColorBaseBrush" />
+            <StaticResource x:Key="MandrillTabForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+            <StaticResource x:Key="MandrillTabActiveBackgroundBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillTabActiveForegroundBrush" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+            <StaticResource x:Key="MandrillTabHoverBorderBrush" ResourceKey="AccentFillColorDefaultBrush" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Default">
             <StaticResource x:Key="MandrillPaneBorderBrush" ResourceKey="CardStrokeColorDefaultBrush" />
@@ -38,6 +46,13 @@
             <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="AccentFillColorDefaultBrush" />
             <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemFillColorCriticalBrush" />
             <SolidColorBrush x:Key="MandrillMainInstructionBrush" Color="#99EBFF" />
+            <!--  Pane tabs (ui-spec §2a): the edge around every tab; the other five are used in high contrast only.  -->
+            <SolidColorBrush x:Key="MandrillTabEdgeBrush" Color="#9A9A9A" />
+            <StaticResource x:Key="MandrillTabBackgroundBrush" ResourceKey="SolidBackgroundFillColorBaseBrush" />
+            <StaticResource x:Key="MandrillTabForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+            <StaticResource x:Key="MandrillTabActiveBackgroundBrush" ResourceKey="AccentFillColorDefaultBrush" />
+            <StaticResource x:Key="MandrillTabActiveForegroundBrush" ResourceKey="TextOnAccentFillColorPrimaryBrush" />
+            <StaticResource x:Key="MandrillTabHoverBorderBrush" ResourceKey="AccentFillColorDefaultBrush" />
             <!--  Menu bar hover: the subtle fills are barely visible in Dark (owner round 6 #4), as in SubtleButtons.xaml.  -->
             <StaticResource x:Key="MenuBarItemBackgroundPointerOver" ResourceKey="SystemControlBackgroundListMediumBrush" />
             <StaticResource x:Key="MenuBarItemBackgroundPressed" ResourceKey="SystemControlBackgroundListLowBrush" />
@@ -53,6 +68,13 @@
             <StaticResource x:Key="MandrillRubberBandStrokeBrush" ResourceKey="SystemColorHighlightColorBrush" />
             <StaticResource x:Key="MandrillPathErrorBrush" ResourceKey="SystemColorHighlightColorBrush" />
             <StaticResource x:Key="MandrillMainInstructionBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <!--  Pane tabs (ui-spec §2a): the edge around every tab; the other five are used in high contrast only.  -->
+            <StaticResource x:Key="MandrillTabEdgeBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="MandrillTabBackgroundBrush" ResourceKey="SystemColorWindowColorBrush" />
+            <StaticResource x:Key="MandrillTabForegroundBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+            <StaticResource x:Key="MandrillTabActiveBackgroundBrush" ResourceKey="SystemColorHighlightColorBrush" />
+            <StaticResource x:Key="MandrillTabActiveForegroundBrush" ResourceKey="SystemColorHighlightTextColorBrush" />
+            <StaticResource x:Key="MandrillTabHoverBorderBrush" ResourceKey="SystemColorHotlightColorBrush" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

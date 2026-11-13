@@ -97,6 +97,9 @@ public enum IconId
 
     /// <summary>View menu: details.</summary>
     ViewDetails,
+
+    /// <summary>Close (a pane tab's x).</summary>
+    Close,
 }
 
 /// <summary>
@@ -148,6 +151,7 @@ public sealed class IconProvider(ILogger? logger = null)
         IconId.ViewSmallIcons => "windows.iconsize.smallicon",
         IconId.ViewList => "windows.iconsize.list",
         IconId.ViewDetails => "windows.iconsize.details",
+        IconId.Close => "windows.close",
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, null),
     };
 

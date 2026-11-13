@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <!--
-    One pane (ui-spec §2): reserved tab row (Details / Large icons buttons at its right end), toolbar (tree toggle, back, forward, up, new folder, view mode, refresh,
+    One pane (ui-spec §2): tab row (PaneTabStrip, §2a; Details / Large icons buttons at its right end), toolbar (tree toggle, back, forward, up, new folder, view mode, refresh,
     search, overflow »), path box, tree column (filled in WP-1.9) and the file list.
 -->
 <UserControl
@@ -40,11 +40,14 @@
         BorderThickness="1">
     <Grid x:Name="Root">
         <Grid.RowDefinitions>
-            <!--  Reserved for the deferred coloured tabs (ui-spec §7).  -->
+            <!--  The tab row: exactly 24 px, owner's hard rule (ui-spec §2a); nothing below may move down.  -->
             <RowDefinition Height="24" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+
+        <!--  First in the pane's Tab order (ui-spec §7); the view buttons, declared last, sit above its strip.  -->
+        <v:PaneTabStrip x:Name="TabRow" />
 
         <Grid
             x:Name="Toolbar"
@@ -146,8 +149,8 @@
         </Grid>
 
         <!--
-            Explorer's status-bar view buttons (Details, Large icons) at the right end of the tab row; the left stays free for
-            the tabs. Declared last so they are the pane's last Tab stops, like Explorer's.
+            Explorer's status-bar view buttons (Details, Large icons) at the right end of the tab row, over the tab strip's
+            2 px colour strip. Declared last so they are the pane's last Tab stops, like Explorer's.
         -->
         <StackPanel
             x:Name="ViewModeButtons"
