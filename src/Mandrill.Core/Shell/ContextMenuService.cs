@@ -41,6 +41,11 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     private const int CopyEngineUserCancelled = unchecked((int)0x8027_0000);
     private const string OwnerClass = "MandrillContextMenuOwner";
 
+    // The background menu's New folder items: the New submenu's Folder, and Windows 11's top-level item (an Explorer command
+    // added at WM_INITMENUPOPUP; it returns S_OK and creates nothing without Explorer's view).
+    // shortcut: that GUID was read from the menu on Windows 10.0.26300; if a build changes it, that item is a no-op again.
+    private static readonly string[] NewFolderVerbs = ["NewFolder", "{0001DEAD-9BF7-4CFA-8A5C-DE8679340002}"];
+
     // An open menu, or a verb's own modal UI (WP-3.1 spike: Shift+"delete" blocks InvokeCommand until its confirmation
     // closes), stays as long as the user wants: only builds count against the hang limit (architecture §7).
     private static readonly TimeSpan UserLimit = TimeSpan.FromHours(1);
@@ -873,6 +878,11 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
             if (string.Equals(verb, "rename", StringComparison.OrdinalIgnoreCase))
             {
                 return new TrackResult(command, verb, new ContextMenuResult(ContextMenuOutcome.Rename, verb));
+            }
+
+            if (request.Target.IsBackground && request.CanRename && NewFolderVerbs.Contains(verb, StringComparer.OrdinalIgnoreCase))
+            {
+                return new TrackResult(command, verb, new ContextMenuResult(ContextMenuOutcome.NewFolder, verb));
             }
 
             if (request.Target.Names.Count == 1 && verb is not null

@@ -79,6 +79,12 @@ public enum ContextMenuOutcome
     Rename,
 
     /// <summary>
+    /// The user chose the shell's New folder on a background with <see cref="ContextMenuRequest.CanRename"/>: the UI creates
+    /// the folder and starts its inline editor (Windows' own top-level item does nothing outside Explorer's view).
+    /// </summary>
+    NewFolder,
+
+    /// <summary>
     /// The user chose Open (or Explore) on a single item: the UI opens it like a double-click, so a folder navigates the
     /// pane instead of opening an Explorer window (QA N1).
     /// </summary>

@@ -345,6 +345,9 @@ public sealed class PaneContextMenus : IDisposable
             case ContextMenuOutcome.Rename when request.Target.Names.Count == 1:
                 view.FileList.BeginRename(request.Target.Names[0]);
                 break;
+            case ContextMenuOutcome.NewFolder:
+                view.RequestNewFolder(); // Ctrl+Shift+N's path: unique name, selected, inline editor; failures in the status bar
+                break;
             case ContextMenuOutcome.Fallback:
                 _logger.LogInformation("Fallback context menu ({Reason}) in {Folder}", result.Reason, request.Target.Folder);
                 BuildFallback(view, request.Target).ShowAt(request.Anchor, new FlyoutShowOptions { Position = request.AnchorPoint });
