@@ -147,6 +147,7 @@ public sealed class IndexService : IIndexService
     private bool _reader; // another instance owns the index: never build, verify, save or delete in index\
     private bool _standby; // a reader that has not loaded the index (it loads on the first search)
     private bool _loadWanted;
+    private bool _replaceLogged;
 
     // Shared state.
     private DriveSegment[] _segments = [];
@@ -1219,7 +1220,13 @@ public sealed class IndexService : IIndexService
         try
         {
             Directory.CreateDirectory(PathUtil.ToIo(_options.IndexDirectory));
-            IndexFile.Save(segment, Path.Combine(_options.IndexDirectory, fileName));
+            bool posix = IndexFile.Save(segment, Path.Combine(_options.IndexDirectory, fileName));
+            if (!_replaceLogged)
+            {
+                _replaceLogged = true;
+                _logger.LogDebug("Index files are replaced with {Method}", posix ? "a POSIX-semantics rename" : "File.Move (no POSIX rename on this volume)");
+            }
+
             DriveIndexInfo? old = _manifest.GetValueOrDefault(letter);
             _manifest[letter] = new DriveIndexInfo(fileName, segment.VolumeSerial, segment.IsComplete, old?.BuiltAtUtc, old?.VerifiedAtUtc, segment.Count);
             IndexManifest.Write(_options.IndexDirectory, new IndexManifest(_manifest));

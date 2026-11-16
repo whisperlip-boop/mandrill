@@ -69,9 +69,10 @@ public static class IndexFile
     /// <summary>Writes <paramref name="segment"/> atomically to <paramref name="path"/>.</summary>
     /// <param name="segment">Segment (its published items and overlay are written).</param>
     /// <param name="path">Target file.</param>
+    /// <returns>True when the file was replaced with a POSIX-semantics rename; false for a plain move (see ReplaceFile).</returns>
     /// <exception cref="IOException">The write failed (the old file, if any, is untouched).</exception>
     /// <exception cref="UnauthorizedAccessException">The folder is not writable.</exception>
-    public static void Save(DriveSegment segment, string path)
+    public static bool Save(DriveSegment segment, string path)
     {
         ArgumentNullException.ThrowIfNull(segment);
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -82,7 +83,7 @@ public static class IndexFile
         try
         {
             WriteFile(segment, tempIo, count, overlay);
-            ReplaceFile(tempIo, pathIo);
+            return ReplaceFile(tempIo, pathIo);
         }
         catch
         {
@@ -96,7 +97,22 @@ public static class IndexFile
     /// also replaces a target that a reader holds open with delete sharing, which a plain move cannot (§18 D2); where it is
     /// unsupported or fails, <see cref="File.Move(string, string, bool)"/> runs and reports the error as before.
     /// </summary>
-    internal static unsafe void ReplaceFile(string sourceIo, string targetIo)
+    /// <returns>True when the POSIX-semantics rename replaced the file; false when the move did.</returns>
+    internal static bool ReplaceFile(string sourceIo, string targetIo) => ReplaceFile(sourceIo, targetIo, TryPosixRename);
+
+    // posixRename is a seam: tests take the fallback through it.
+    internal static bool ReplaceFile(string sourceIo, string targetIo, Func<string, string, bool> posixRename)
+    {
+        if (posixRename(sourceIo, targetIo))
+        {
+            return true;
+        }
+
+        File.Move(sourceIo, targetIo, overwrite: true);
+        return false;
+    }
+
+    private static unsafe bool TryPosixRename(string sourceIo, string targetIo)
     {
         const uint DeleteAccess = 0x0001_0000; // DELETE: the right a rename needs
         const uint ReplaceIfExistsPosix = 0x1 | 0x2; // FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS
@@ -120,14 +136,11 @@ public static class IndexFile
                     targetIo.CopyTo(info->FileName.AsSpan(targetIo.Length));
                 }
 
-                if (PInvoke.SetFileInformationByHandle(handle, FILE_INFO_BY_HANDLE_CLASS.FileRenameInfoEx, buffer))
-                {
-                    return;
-                }
+                return PInvoke.SetFileInformationByHandle(handle, FILE_INFO_BY_HANDLE_CLASS.FileRenameInfoEx, buffer);
             }
         }
 
-        File.Move(sourceIo, targetIo, overwrite: true);
+        return false;
     }
 
     private static void WriteFile(DriveSegment segment, string tempIo, int count, IReadOnlyList<OverlayItem> overlay)
