@@ -201,6 +201,23 @@ public sealed partial class FavoritesViewModel : ObservableObject
         return FavoriteSaveOutcome.Saved;
     }
 
+    /// <summary>
+    /// Shows the favorites another instance saved (architecture §18 D3), nothing written: the next change here saves a
+    /// list that contains them. UI thread.
+    /// </summary>
+    /// <param name="document">The reloaded, normalized favorites.</param>
+    public void ReplaceAll(FavoritesDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        Items.Clear();
+        foreach (Favorite favorite in document.Favorites)
+        {
+            Items.Add(favorite);
+        }
+
+        _logger.LogInformation("Favorites changed by another instance: {Count}", Items.Count);
+    }
+
     /// <summary>Deletes a favorite (AC-1.30; the view asked for confirmation).</summary>
     /// <param name="name">Name.</param>
     /// <param name="ct">Cancellation token for the write.</param>

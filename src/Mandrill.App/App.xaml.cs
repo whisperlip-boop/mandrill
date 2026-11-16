@@ -43,6 +43,7 @@ public sealed partial class App : Application
     private SessionCoordinator? _session;
     private DialogLauncher? _dialogs;
     private SearchWindows? _searchWindows;
+    private StateFileWatcher? _stateWatcher;
     private PaneContextMenus? _contextMenus;
     private Action<IndexStatus>? _indexStatusHandler;
     private bool _windowClosed;
@@ -190,6 +191,7 @@ public sealed partial class App : Application
                 searchWindows.ApplyTheme(theme, refresh);
             });
             settings.Changed += services.Index.ApplySettings; // AC-2.10 at runtime: excludes and RescanHours (queued to the index thread)
+            _ = WatchStateFilesAsync(boot, settings, favorites, dispatcher);
             _window.ShowFavorites(favorites, boot.LoggerFactory.CreateLogger<FavoritesBar>());
             _window.Closed += OnWindowClosed;
             PerfLog.Mark("favorites shown");
@@ -427,6 +429,7 @@ public sealed partial class App : Application
                 view.DriveList.Detach();
             }
 
+            _stateWatcher?.Dispose();
             _ = _session?.DisposeAsync().AsTask();
             _services?.Dispose();
         }
@@ -441,6 +444,63 @@ public sealed partial class App : Application
         }
 
         FlushLog();
+    }
+
+    // §18 D3: settings or favorites saved by another instance are reloaded (worker) and applied here (UI thread).
+    private async Task WatchStateFilesAsync(BootstrapResult boot, SettingsService settings, FavoritesViewModel favorites, IUiDispatcher dispatcher)
+    {
+        try
+        {
+            var watcher = await Task.Run(() => new StateFileWatcher(boot.Paths.DataDirectory, boot.LoggerFactory.CreateLogger<StateFileWatcher>()));
+            if (_windowClosed)
+            {
+                watcher.Dispose();
+                return;
+            }
+
+            watcher.Changed += file => _ = ReloadStateAsync(file, boot.State, settings, favorites, dispatcher);
+            _stateWatcher = watcher;
+        }
+        catch (Exception ex)
+        {
+            // No data folder (it could not be created) or no watcher: this window just does not follow the others.
+            _log.LogWarning(ex, "Settings and favorites of other Mandrill windows are not followed");
+        }
+    }
+
+    // Thread pool (watcher event). A failed reload keeps the current values; the next save by another window retries.
+    private async Task ReloadStateAsync(string file, StartupState state, SettingsService settings, FavoritesViewModel favorites, IUiDispatcher dispatcher)
+    {
+        try
+        {
+            if (file == StateFileWatcher.SettingsFileName)
+            {
+                if (await state.SettingsStore.TryReloadAsync(CancellationToken.None) is { } next)
+                {
+                    dispatcher.Post(() =>
+                    {
+                        if (!_windowClosed)
+                        {
+                            settings.ApplyExternal(next);
+                        }
+                    });
+                }
+            }
+            else if (await state.FavoritesStore.TryReloadAsync(CancellationToken.None) is { } document)
+            {
+                dispatcher.Post(() =>
+                {
+                    if (!_windowClosed)
+                    {
+                        favorites.ReplaceAll(document);
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Reloading {File} saved by another window failed", file);
+        }
     }
 
     // Quick access and drive labels need disk checks (worker); the tree shows plain drives until they arrive.

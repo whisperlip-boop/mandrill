@@ -33,6 +33,18 @@ public sealed class SettingsService
     public LayoutDefaults LayoutDefaults => Current.LayoutDefaults;
 
     /// <summary>
+    /// Takes the settings another instance saved (architecture §18 D3): in effect at once through <see cref="Changed"/>,
+    /// nothing written. A changed language still applies only after this window restarts.
+    /// </summary>
+    /// <param name="settings">The reloaded, normalized settings.</param>
+    public void ApplyExternal(AppSettings settings)
+    {
+        Current = settings ?? throw new ArgumentNullException(nameof(settings));
+        _logger.LogInformation("Settings changed by another instance (theme {Theme}, favorites bar {Bar}, layouts {Two}/{Three})", settings.Theme, settings.ShowFavoritesBar, settings.LayoutDefaults.TwoPanes, settings.LayoutDefaults.ThreePanes);
+        Changed?.Invoke();
+    }
+
+    /// <summary>
     /// Applies <paramref name="next"/> at once and writes settings.json (temp file + replace). A failed write is logged and
     /// reported; the new values stay in effect for this session.
     /// </summary>

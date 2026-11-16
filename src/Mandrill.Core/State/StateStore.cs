@@ -30,9 +30,27 @@ public sealed class StateStore<T>
     /// <summary>Loads and normalizes the document. Missing → defaults; corrupt → .bak + defaults.</summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A normalized document.</returns>
-    public async Task<T> LoadAsync(CancellationToken ct)
+    public async Task<T> LoadAsync(CancellationToken ct) => Normalize(await _store.LoadAsync(ct).ConfigureAwait(false));
+
+    /// <summary>
+    /// Reads and normalizes the document again while the app runs (see <see cref="JsonStore{T}.TryReloadAsync"/>): no
+    /// defaults, no .bak, no temp cleanup.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A normalized document, or null when it cannot be read or parsed (keep the current values).</returns>
+    public async Task<T?> TryReloadAsync(CancellationToken ct)
+        => await _store.TryReloadAsync(ct).ConfigureAwait(false) is { } loaded ? Normalize(loaded) : null;
+
+    /// <summary>Writes the document atomically (see <see cref="JsonStore{T}.SaveAsync"/>).</summary>
+    /// <param name="value">Document to write.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task that completes when the file has been replaced.</returns>
+    /// <exception cref="IOException">The file cannot be written or replaced.</exception>
+    /// <exception cref="UnauthorizedAccessException">Access to the data directory is denied.</exception>
+    public Task SaveAsync(T value, CancellationToken ct) => _store.SaveAsync(value, ct);
+
+    private T Normalize(T loaded)
     {
-        T loaded = await _store.LoadAsync(ct).ConfigureAwait(false);
         var fixes = new List<string>();
         T normalized = loaded.Normalize(fixes);
         if (fixes.Count > 0)
@@ -42,12 +60,4 @@ public sealed class StateStore<T>
 
         return normalized;
     }
-
-    /// <summary>Writes the document atomically (see <see cref="JsonStore{T}.SaveAsync"/>).</summary>
-    /// <param name="value">Document to write.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>A task that completes when the file has been replaced.</returns>
-    /// <exception cref="IOException">The file cannot be written or replaced.</exception>
-    /// <exception cref="UnauthorizedAccessException">Access to the data directory is denied.</exception>
-    public Task SaveAsync(T value, CancellationToken ct) => _store.SaveAsync(value, ct);
 }

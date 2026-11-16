@@ -18,6 +18,8 @@ public sealed class JsonStore<T>
     private const string VersionProperty = "version";
     private const int ReplaceAttempts = 5;
     private const int ReplaceRetryDelayMs = 20;
+    private const int ReloadAttempts = 3;
+    private const int ReloadRetryDelayMs = 50;
     private static readonly TimeSpan StaleTempAge = TimeSpan.FromMinutes(1);
     private readonly string _path;
     private readonly JsonTypeInfo<T> _typeInfo;
@@ -86,6 +88,52 @@ public sealed class JsonStore<T>
         {
             BackUpCorrupt(ex);
             return _createDefault();
+        }
+    }
+
+    /// <summary>
+    /// Reads the document again while the app runs, after another instance saved it (architecture §18 D3). Unlike
+    /// <see cref="LoadAsync"/> it never hands out defaults, never moves the file to .bak and never deletes temp files: a
+    /// running window must keep its values when the read fails. Up to 3 reads 50 ms apart (a replace or a scanner holds
+    /// the file).
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document, or null when the file is missing, stays unreadable or does not parse (logged).</returns>
+    public async Task<T?> TryReloadAsync(CancellationToken ct)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            byte[] bytes;
+            try
+            {
+                bytes = await File.ReadAllBytesAsync(_path, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                _logger.LogWarning("{File} is gone; keeping the current values", _path);
+                return null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= ReloadAttempts)
+                {
+                    _logger.LogWarning(ex, "Cannot read {File} after {Attempts} tries; keeping the current values", _path, attempt);
+                    return null;
+                }
+
+                await Task.Delay(ReloadRetryDelayMs, ct).ConfigureAwait(false);
+                continue;
+            }
+
+            try
+            {
+                return Parse(bytes);
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+            {
+                _logger.LogWarning(ex, "{File} does not parse; keeping the current values", _path);
+                return null;
+            }
         }
     }
 
