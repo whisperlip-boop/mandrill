@@ -164,6 +164,7 @@
         <ListView
             x:Name="Results"
             Grid.Row="4"
+            Background="{ThemeResource MandrillContentBackgroundBrush}"
             AutomationProperties.Name="{m:Tr Key=search.results}"
             CanDragItems="True"
             IsItemClickEnabled="False"
