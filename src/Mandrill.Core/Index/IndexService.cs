@@ -148,6 +148,7 @@ public sealed class IndexService : IIndexService
     private bool _standby; // a reader that has not loaded the index (it loads on the first search)
     private bool _loadWanted;
     private bool _replaceLogged;
+    private bool _lockWarned;
 
     // Shared state.
     private DriveSegment[] _segments = [];
@@ -479,6 +480,7 @@ public sealed class IndexService : IIndexService
         if (!restart)
         {
             CompleteLoaded(); // no thread runs a queued load any more
+            ReleaseOwnerLock(); // nobody maintains the index here any more: let another instance take over
             _stopped.TrySetResult(); // stays in Error; the segments stay searchable
         }
     }
@@ -509,7 +511,14 @@ public sealed class IndexService : IIndexService
                 ChooseRole();
                 if (!_standby)
                 {
-                    LoadAll();
+                    try
+                    {
+                        LoadAll();
+                    }
+                    finally
+                    {
+                        CompleteLoaded(); // usable now; builds run later and search covers them as they go
+                    }
                 }
 
                 SatisfyLoad();
@@ -1050,6 +1059,11 @@ public sealed class IndexService : IIndexService
     // running one does not (it may have listed the changed folders already).
     private void VerifyOverflows()
     {
+        if (_reader)
+        {
+            return; // a reader cannot verify: the marks wait for a takeover
+        }
+
         DateTime now = _options.Time.GetUtcNow().UtcDateTime;
         foreach (string root in _overflowPending.ToList())
         {
@@ -1293,7 +1307,9 @@ public sealed class IndexService : IIndexService
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _logger.LogWarning(ex, "Index: the owner lock is unavailable");
+            // Once: a reader's retry would repeat it every minute.
+            _logger.Log(_lockWarned ? LogLevel.Debug : LogLevel.Warning, ex, "Index: the owner lock is unavailable");
+            _lockWarned = true;
             return null;
         }
     }
@@ -1327,11 +1343,12 @@ public sealed class IndexService : IIndexService
         }
     }
 
+    // Also before any EnsureLoadedAsync call: a later call then finds a completed task and queues nothing.
     private void CompleteLoaded()
     {
         lock (_gate)
         {
-            _loaded?.TrySetResult();
+            (_loaded ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
         }
     }
 
@@ -1359,8 +1376,14 @@ public sealed class IndexService : IIndexService
         if (_standby)
         {
             _standby = false;
-            LoadAll();
-            CompleteLoaded();
+            try
+            {
+                LoadAll();
+            }
+            finally
+            {
+                CompleteLoaded();
+            }
         }
         else
         {
@@ -1373,7 +1396,13 @@ public sealed class IndexService : IIndexService
     // them). Missing and incomplete drives are then loaded or built as at an owner's start.
     private void ReloadChanged()
     {
+        RemoveStaleTempFiles(); // a killed owner's half-written saves; the owner now
         _manifest = new Dictionary<string, DriveIndexInfo>(IndexManifest.Read(_options.IndexDirectory, _logger).Drives, StringComparer.OrdinalIgnoreCase);
+        if (_manifest.Values.Select(LastPass).Max() is { } lastPass && (_lastUpdatedUtc is null || lastPass > _lastUpdatedUtc))
+        {
+            _lastUpdatedUtc = lastPass;
+        }
+
         foreach (DriveSegment segment in Segments.ToList())
         {
             if (!_manifest.TryGetValue(LetterOf(segment.Root), out DriveIndexInfo? info) || info.VolumeSerial != segment.VolumeSerial)

@@ -114,11 +114,9 @@ public static class IndexFile
 
     private static unsafe bool TryPosixRename(string sourceIo, string targetIo)
     {
-        const uint DeleteAccess = 0x0001_0000; // DELETE: the right a rename needs
-        const uint ReplaceIfExistsPosix = 0x1 | 0x2; // FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS
         using (SafeFileHandle handle = PInvoke.CreateFile(
             sourceIo,
-            DeleteAccess,
+            (uint)FILE_ACCESS_RIGHTS.DELETE, // the right a rename needs
             FILE_SHARE_MODE.FILE_SHARE_READ | FILE_SHARE_MODE.FILE_SHARE_DELETE,
             null,
             FILE_CREATION_DISPOSITION.OPEN_EXISTING,
@@ -131,7 +129,7 @@ public static class IndexFile
                 fixed (byte* p = buffer)
                 {
                     var info = (FILE_RENAME_INFO*)p;
-                    info->Anonymous.Flags = ReplaceIfExistsPosix;
+                    info->Anonymous.Flags = PInvoke.FILE_RENAME_FLAG_REPLACE_IF_EXISTS | PInvoke.FILE_RENAME_FLAG_POSIX_SEMANTICS;
                     info->FileNameLength = (uint)(targetIo.Length * sizeof(char));
                     targetIo.CopyTo(info->FileName.AsSpan(targetIo.Length));
                 }
