@@ -138,6 +138,11 @@
             <TextBlock Text="{m:Tr Key=search.indexing}" TextWrapping="Wrap" />
         </Border>
 
+        <!--  Header band, row gap and list share the pane's content background, as FileListView does.  -->
+        <Border
+            Grid.Row="3"
+            Grid.RowSpan="2"
+            Background="{ThemeResource MandrillContentBackgroundBrush}" />
         <Grid
             x:Name="HeaderClip"
             Grid.Row="3"
