@@ -26,9 +26,9 @@ favorite, and find files by name across your local drives from Mandrill's own in
 
 | Language | Native name |
 |---|---|
-| English (United States) | English (United States) |
-| Japanese (Japan) | 日本語 (日本) |
-| Korean (South Korea) | 한국어(대한민국) |
+| English | English |
+| Japanese | 日本語 |
+| Korean | 한국어 |
 | Chinese (Simplified) | 中文 (简体) |
 | Chinese (Traditional) | 中文 (繁體) |
 
