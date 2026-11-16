@@ -446,6 +446,9 @@ public sealed partial class App : Application
 
         if (_restartOnClose)
         {
+            // This process is ending: give its instance number to the new one, so a restarted window takes the same number
+            // and is not cascaded like a second window (QA MI F2). A New window keeps its own number, so it cascades.
+            _boot?.Dispose();
             AppRestart.StartNewInstance(_log, "restart"); // logs a failure; nothing is left on screen to report it in
         }
 
@@ -467,9 +470,10 @@ public sealed partial class App : Application
             watcher.Changed += file => _ = ReloadStateAsync(file, boot.State, settings, favorites, dispatcher);
             _stateWatcher = watcher;
 
-            // A save by another window between this window's start-up load and now raised nothing: catch up once.
-            _ = ReloadStateAsync(StateFileWatcher.SettingsFileName, boot.State, settings, favorites, dispatcher);
-            _ = ReloadStateAsync(StateFileWatcher.FavoritesFileName, boot.State, settings, favorites, dispatcher);
+            // A save by another window between this window's start-up load and now raised nothing: catch up once (a file
+            // that does not exist yet is nothing to catch up on, no warning).
+            _ = ReloadStateAsync(StateFileWatcher.SettingsFileName, boot.State, settings, favorites, dispatcher, catchUp: true);
+            _ = ReloadStateAsync(StateFileWatcher.FavoritesFileName, boot.State, settings, favorites, dispatcher, catchUp: true);
         }
         catch (Exception ex)
         {
@@ -479,14 +483,14 @@ public sealed partial class App : Application
     }
 
     // Thread pool (watcher event). A failed reload keeps the current values; the next save by another window retries.
-    private async Task ReloadStateAsync(string file, StartupState state, SettingsService settings, FavoritesViewModel favorites, IUiDispatcher dispatcher)
+    private async Task ReloadStateAsync(string file, StartupState state, SettingsService settings, FavoritesViewModel favorites, IUiDispatcher dispatcher, bool catchUp = false)
     {
         try
         {
             if (file == StateFileWatcher.SettingsFileName)
             {
                 int request = Interlocked.Increment(ref _settingsReloads);
-                if (await state.SettingsStore.TryReloadAsync(CancellationToken.None) is { } next)
+                if (await state.SettingsStore.TryReloadAsync(CancellationToken.None, missingIsExpected: catchUp) is { } next)
                 {
                     dispatcher.Post(() =>
                     {
@@ -500,7 +504,7 @@ public sealed partial class App : Application
             else
             {
                 int request = Interlocked.Increment(ref _favoritesReloads);
-                if (await state.FavoritesStore.TryReloadAsync(CancellationToken.None) is { } document)
+                if (await state.FavoritesStore.TryReloadAsync(CancellationToken.None, missingIsExpected: catchUp) is { } document)
                 {
                     dispatcher.Post(() =>
                     {

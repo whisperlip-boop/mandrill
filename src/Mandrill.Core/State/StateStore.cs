@@ -37,9 +37,10 @@ public sealed class StateStore<T>
     /// defaults, no .bak, no temp cleanup.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="missingIsExpected">True for a check without a save behind it: a missing file is logged at Debug.</param>
     /// <returns>A normalized document, or null when it cannot be read or parsed (keep the current values).</returns>
-    public async Task<T?> TryReloadAsync(CancellationToken ct)
-        => await _store.TryReloadAsync(ct).ConfigureAwait(false) is { } loaded ? Normalize(loaded) : null;
+    public async Task<T?> TryReloadAsync(CancellationToken ct, bool missingIsExpected = false)
+        => await _store.TryReloadAsync(ct, missingIsExpected).ConfigureAwait(false) is { } loaded ? Normalize(loaded) : null;
 
     /// <summary>Writes the document atomically (see <see cref="JsonStore{T}.SaveAsync"/>).</summary>
     /// <param name="value">Document to write.</param>

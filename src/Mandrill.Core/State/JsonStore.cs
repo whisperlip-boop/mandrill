@@ -98,8 +98,10 @@ public sealed class JsonStore<T>
     /// the file).
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="missingIsExpected">True for a check without a save behind it (the catch-up at start): a file that does
+    /// not exist yet is no warning then.</param>
     /// <returns>The document, or null when the file is missing, stays unreadable or does not parse (logged).</returns>
-    public async Task<T?> TryReloadAsync(CancellationToken ct)
+    public async Task<T?> TryReloadAsync(CancellationToken ct, bool missingIsExpected = false)
     {
         for (int attempt = 1; ; attempt++)
         {
@@ -110,7 +112,7 @@ public sealed class JsonStore<T>
             }
             catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
             {
-                _logger.LogWarning("{File} is gone; keeping the current values", _path);
+                _logger.Log(missingIsExpected ? LogLevel.Debug : LogLevel.Warning, "{File} is gone; keeping the current values", _path);
                 return null;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
