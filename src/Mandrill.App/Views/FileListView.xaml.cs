@@ -221,7 +221,46 @@ public sealed partial class FileListView : UserControl
     }
 
     /// <summary>Moves keyboard focus to the list (focused item if any).</summary>
-    public void FocusList() => _list?.Focus(FocusState.Programmatic);
+    public void FocusList()
+    {
+        if (_list is { } list)
+        {
+            TakeFocus(list, FocusState.Programmatic);
+        }
+    }
+
+    /// <summary>
+    /// A press on <paramref name="source"/> (the pointer handler; tests): on the list's empty area (no row, no scroll bar) the
+    /// list takes the focus like Explorer's, so Ctrl+V, Del and the other list keys act in this pane.
+    /// </summary>
+    /// <param name="source">The element under the pointer.</param>
+    /// <returns>True when the press was on the empty area: the handler marks it handled, or WinUI moves the focus to the
+    /// window's root afterwards (owner's 1.0.1 report: Ctrl+V did nothing).</returns>
+    public bool FocusFromEmptyPress(DependencyObject? source)
+    {
+        if (_list is not { } list || Ancestor<SelectorItem>(source, list) is not null || Ancestor<ScrollBar>(source, list) is not null)
+        {
+            return false;
+        }
+
+        if (!HasFocusWithin)
+        {
+            TakeFocus(list, FocusState.Pointer);
+        }
+
+        return true;
+    }
+
+    // An empty list has no row to hold the focus, so the list itself takes it until the focus leaves it (LostFocus resets).
+    private static void TakeFocus(ListViewBase list, FocusState state)
+    {
+        if (list.Items.Count == 0)
+        {
+            list.IsTabStop = true;
+        }
+
+        list.Focus(state);
+    }
 
     /// <summary>
     /// Whether the pane is active (WP-1.10): the active pane shows Explorer's selection, inactive panes a grey one
@@ -410,6 +449,7 @@ public sealed partial class FileListView : UserControl
             if (!HasFocusWithin)
             {
                 CancelSlowClick();
+                list.IsTabStop = false;
             }
         };
         list.CharacterReceived += OnCharacterReceived;
@@ -417,6 +457,7 @@ public sealed partial class FileListView : UserControl
         list.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(OnPointerWheel), handledEventsToo: true);
         list.AddHandler(PointerPressedEvent, new PointerEventHandler(OnSlowClickPressed), handledEventsToo: true);
         list.AddHandler(PointerReleasedEvent, new PointerEventHandler(OnSlowClickReleased), handledEventsToo: true);
+        list.AddHandler(PointerPressedEvent, new PointerEventHandler((_, e) => e.Handled |= FocusFromEmptyPress(e.OriginalSource as DependencyObject)), handledEventsToo: true);
         list.GettingFocus += (_, e) => _focusEnteredByPointer |= e.InputDevice is FocusInputDeviceKind.Mouse or FocusInputDeviceKind.Pen or FocusInputDeviceKind.Touch
             && !IsWithin(e.OldFocusedElement, list);
         if (mode != ViewMode.Details)
@@ -1292,8 +1333,7 @@ public sealed partial class FileListView : UserControl
             _list.DeselectRange(new ItemIndexRange(0, (uint)_adapter.Count)); // a click on empty space clears (Explorer)
         }
 
-        _list.CapturePointer(e.Pointer);
-        _list.Focus(FocusState.Pointer);
+        _list.CapturePointer(e.Pointer); // the focus: FocusFromEmptyPress, which runs first
         e.Handled = true;
     }
 

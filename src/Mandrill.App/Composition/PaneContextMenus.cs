@@ -144,9 +144,9 @@ public sealed class PaneContextMenus : IDisposable
     }
 
     /// <summary>
-    /// Mandrill's own items at the end of the native menu (architecture §7, AC-3.6): Open in Terminal for the background and
-    /// a single folder (Windows Terminal, cmd fallback), Copy path for items (lead's WP-3.1 list; the background's path is in
-    /// the path box and in the fallback menu).
+    /// Mandrill's own items at the end of the native menu (architecture §7, AC-3.6): Paste for the background while the
+    /// clipboard holds files, Open in Terminal for the background and a single folder (Windows Terminal, cmd fallback), Copy
+    /// path for items (lead's WP-3.1 list; the background's path is in the path box and in the fallback menu).
     /// </summary>
     /// <param name="view">The pane view (to tell a folder item from a file).</param>
     /// <param name="target">Items or background.</param>
@@ -156,6 +156,14 @@ public sealed class PaneContextMenus : IDisposable
         ArgumentNullException.ThrowIfNull(view);
         ArgumentNullException.ThrowIfNull(target);
         var commands = new List<(string Text, Action Run)>();
+
+        // The shell's background menu has no Paste (Explorer's comes from its own view, not the folder's menu); a folder
+        // item's menu has the shell's own.
+        if (target.IsBackground && _clipboardFiles.Current is not null && view.ViewModel is { FolderError: null })
+        {
+            commands.Add((Localizer.Current["context.paste"], () => _ = RunSafeAsync(PasteAsync(view, target.Folder), "Paste")));
+        }
+
         string? terminalFolder = target.IsBackground ? target.Folder
             : target.Names.Count == 1 && EntryOf(view, target.Names[0]) is { IsDirectory: true } ? PathUtil.Combine(target.Folder, target.Names[0])
             : null;
