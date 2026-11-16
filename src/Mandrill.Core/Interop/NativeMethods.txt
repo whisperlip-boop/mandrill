@@ -152,6 +152,7 @@ SHELLEXECUTEINFOW
 // WP-3.1 follow-ups: own-item de-duplication, Shift at invoke time
 GetMenuString
 GetKeyState
+DeleteMenu
 // WP-3.2 ShellFileOperations: progress sink (per-item results, final names), display names, FOFX flags
 IFileOperationProgressSink
 SIGDN

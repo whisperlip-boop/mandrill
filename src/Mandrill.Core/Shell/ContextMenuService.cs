@@ -424,20 +424,31 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
 
             if (msg is PInvoke.WM_INITMENUPOPUP or PInvoke.WM_DRAWITEM or PInvoke.WM_MEASUREITEM or PInvoke.WM_MENUCHAR && t_tracking is { } session)
             {
-                unsafe
+                try
                 {
-                    if (session.Handler is IContextMenu3 menu3)
+                    unsafe
                     {
-                        LRESULT result = default;
-                        menu3.HandleMenuMsg2(msg, wParam, lParam, &result);
-                        return result;
+                        if (session.Handler is IContextMenu3 menu3)
+                        {
+                            LRESULT result = default;
+                            menu3.HandleMenuMsg2(msg, wParam, lParam, &result);
+                            return result;
+                        }
+                    }
+
+                    if (session.Handler is IContextMenu2 menu2)
+                    {
+                        menu2.HandleMenuMsg(msg, wParam, lParam);
+                        return default;
                     }
                 }
-
-                if (session.Handler is IContextMenu2 menu2)
+                finally
                 {
-                    menu2.HandleMenuMsg(msg, wParam, lParam);
-                    return default;
+                    // Also when the handler throws (a WM_INITMENUPOPUP failure is routinely logged below on Windows 11).
+                    if (msg == PInvoke.WM_INITMENUPOPUP && (nint)wParam.Value == (nint)session.Menu)
+                    {
+                        RemoveShellDuplicates(session.Menu, session.Own);
+                    }
                 }
             }
         }
@@ -717,24 +728,16 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
 
             if (commands is { Count: > 0 })
             {
-                // §7: Mandrill's own items at the end, after a separator, above the shell's id range (id = 0x8000 + index, so
-                // a skipped item never shifts the others). QA N3: an item the shell already has (Windows 11's "Open in
-                // Terminal") is not added twice. A failed append gives the fallback menu instead of a partial list.
-                var existing = MenuTexts(menu);
-                bool separated = false;
+                // §7: Mandrill's own items at the end, after a separator, above the shell's id range (id = 0x8000 + index).
+                // QA N3: a shell item with the same text goes when the menu opens (RemoveShellDuplicates). A failed append
+                // gives the fallback menu instead of a partial list.
+                if (!PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (PCWSTR)null))
+                {
+                    return EFail;
+                }
+
                 for (int i = 0; i < commands.Count; i++)
                 {
-                    if (existing.Contains(Plain(commands[i])))
-                    {
-                        continue;
-                    }
-
-                    if (!separated && !PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (PCWSTR)null))
-                    {
-                        return EFail;
-                    }
-
-                    separated = true;
                     fixed (char* text = commands[i])
                     {
                         if (!PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_STRING, FirstOwnCommand + (uint)i, text))
@@ -752,7 +755,7 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
                 return EAbort;
             }
 
-            (t_sessions ??= []).Add(id, new MenuSession(id, handler, menu));
+            (t_sessions ??= []).Add(id, new MenuSession(id, handler, menu, (commands ?? []).Select(Plain).ToHashSet(StringComparer.OrdinalIgnoreCase)));
             stored = true;
             return 0;
         }
@@ -789,11 +792,50 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
         }
     }
 
-    // A menu text without its mnemonic "&" and accelerator, for comparing items.
+    // A menu text without its accelerator, its CJK-style access key "(&T)" and its mnemonic "&", for comparing items.
     private static string Plain(string text)
     {
         int tab = text.IndexOf('\t', StringComparison.Ordinal);
-        return (tab >= 0 ? text[..tab] : text).Replace("&", string.Empty, StringComparison.Ordinal).Trim();
+        string label = tab >= 0 ? text[..tab] : text;
+        int key = label.IndexOf("(&", StringComparison.Ordinal);
+        if (key >= 0 && key + 3 < label.Length && label[key + 3] == ')')
+        {
+            label = label.Remove(key, 4);
+        }
+
+        return label.Replace("&", string.Empty, StringComparison.Ordinal).Trim();
+    }
+
+    /// <summary>
+    /// QA N3 (lead): removes the shell's items whose text is one of Mandrill's own (<paramref name="own"/>, plain texts), so
+    /// each command is in the menu once and ours, the known path, stays. Runs when the menu opens, after the shell added its
+    /// lazy Explorer-command items (Windows 11's "Open in Terminal" arrives at WM_INITMENUPOPUP, not at QueryContextMenu).
+    /// </summary>
+    /// <param name="menu">The top-level menu.</param>
+    /// <param name="own">Plain texts of Mandrill's own items.</param>
+    internal static unsafe void RemoveShellDuplicates(HMENU menu, IReadOnlySet<string> own)
+    {
+        if (own.Count == 0)
+        {
+            return;
+        }
+
+        // shortcut: separators around a removed item stay; trim them if a menu ever shows a double line.
+        char* buffer = stackalloc char[256];
+        for (int i = PInvoke.GetMenuItemCount(menu) - 1; i >= 0; i--)
+        {
+            uint id = PInvoke.GetMenuItemID(menu, i);
+            if (id is 0 or uint.MaxValue || id >= FirstOwnCommand)
+            {
+                continue; // a separator, a submenu, or one of ours
+            }
+
+            int length = PInvoke.GetMenuString(menu, (uint)i, buffer, 256, MENU_ITEM_FLAGS.MF_BYPOSITION);
+            if (length > 0 && own.Contains(Plain(new string(buffer, 0, length))))
+            {
+                PInvoke.DeleteMenu(menu, (uint)i, MENU_ITEM_FLAGS.MF_BYPOSITION);
+            }
+        }
     }
 
     private static unsafe HashSet<string> MenuTexts(HMENU menu)
@@ -928,7 +970,8 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
         }
     }
 
-    private sealed record MenuSession(long Id, IContextMenu Handler, HMENU Menu);
+    // Own: the texts of Mandrill's own items (Plain), for RemoveShellDuplicates.
+    private sealed record MenuSession(long Id, IContextMenu Handler, HMENU Menu, HashSet<string> Own);
 
     private sealed record TrackResult(uint Command, string? Verb, ContextMenuResult? Result)
     {
