@@ -197,7 +197,11 @@ public sealed partial class FileListView : UserControl
         vm.PropertyChanged += OnViewModelChanged;
         vm.Items.Resetting += () => _resetFrom = vm.Items.Current?.Path;
         vm.Items.Reset += OnItemsReset;
-        vm.Items.CollectionChanged += (_, _) => UpdateMessage();
+        vm.Items.CollectionChanged += (_, _) =>
+        {
+            UpdateMessage();
+            HandFocusToARow(); // after the adapter (subscribed first) has passed the change to the control
+        };
         vm.SelectionRequested += OnSelectionRequested;
         _iconsReadyHandler = keys => _dispatcher.Post(() => OnIconsReady(keys), UiPriority.Low);
         _typeNamesHandler = () => _dispatcher.Post(RefreshTypeCells, UiPriority.Low);
@@ -1018,6 +1022,27 @@ public sealed partial class FileListView : UserControl
         }
 
         UpdateMessage();
+    }
+
+    // QA A4: an empty list that held the focus itself (TakeFocus) keeps it once rows arrive (a paste), and the keys then do
+    // nothing; the first row takes it, as in any list. The rows are laid out first: an unrealized row cannot take the focus.
+    private void HandFocusToARow()
+    {
+        if (_list is not { IsTabStop: true } list || _adapter is not { Count: > 0 } || XamlRoot is null)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), list))
+        {
+            list.UpdateLayout();
+            if ((list.ContainerFromIndex(0) as Control)?.Focus(FocusState.Programmatic) != true)
+            {
+                return; // the list keeps the focus and its tab stop; the next change tries again
+            }
+        }
+
+        list.IsTabStop = false;
     }
 
     // One perf line per folder shown: load start → the next frame after its first rows were set.
