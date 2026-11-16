@@ -1,4 +1,4 @@
-# Mandrill
+# Mandrill <img src="assets/mandrill.png" alt="Mandrill icon" height="32">
 
 A fast multi-pane file explorer for Windows 11. Browse up to four folders side by side, save a whole workspace as a
 favorite, and find files by name across your local drives from Mandrill's own index.
