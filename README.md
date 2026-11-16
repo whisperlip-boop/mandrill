@@ -29,8 +29,8 @@ favorite, and find files by name across your local drives from Mandrill's own in
 | English | English |
 | Japanese | 日本語 |
 | Korean | 한국어 |
-| Chinese (Simplified) | 中文 (简体) |
-| Chinese (Traditional) | 中文 (繁體) |
+| Chinese (Simplified) | 简体中文 |
+| Chinese (Traditional) | 繁體中文 |
 
 Change the language with **File → Language…**. The default, **Auto (Windows language)**, follows the Windows display
 language. A new language applies after Mandrill restarts.
