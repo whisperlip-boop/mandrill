@@ -1443,6 +1443,15 @@ public sealed class IndexService : IIndexService
                 }
 
                 _logger.LogInformation("Index {Root} refreshed from the owner's save: {Items} items, complete {Complete}", root, fresh.Count, fresh.IsComplete);
+                if (stale.Applied is null)
+                {
+                    // Over the cap: this reload could not bring back this reader's own changes. Start over: the owner's
+                    // next save has them.
+                    stale.Since = _options.Time.GetUtcNow().UtcDateTime;
+                    stale.Applied = new HashSet<string>(PathUtil.Comparer);
+                    continue;
+                }
+
                 if (fresh.IsComplete && (!stale.NeedsPass || LastPass(info) is { } pass && pass >= stale.Since))
                 {
                     _stale.Remove(root); // the owner has everything since it went stale
@@ -1492,7 +1501,7 @@ public sealed class IndexService : IIndexService
         if (applied.Count > MaxReplayPaths)
         {
             stale.Applied = null;
-            _logger.LogWarning("Index {Root}: over {Max} changed paths while waiting for the owner; they are missing here until this instance owns the index or restarts", root, MaxReplayPaths);
+            _logger.LogWarning("Index {Root}: over {Max} changed paths while waiting for the owner; some may be missing here until the owner's next save", root, MaxReplayPaths);
         }
     }
 
