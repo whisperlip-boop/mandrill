@@ -50,10 +50,11 @@ public sealed class SettingsService
         Changed?.Invoke();
     }
 
-    // Value equality: the exclude list compares by reference in the record.
+    // Record equality with the one list factored out (it compares by reference): a field added later is compared too.
     private static bool Same(AppSettings a, AppSettings b)
-        => a.Language == b.Language && a.Theme == b.Theme && a.ShowFavoritesBar == b.ShowFavoritesBar && a.LayoutDefaults == b.LayoutDefaults
-            && a.Index.RescanHours == b.Index.RescanHours && (a.Index.Exclude ?? []).SequenceEqual(b.Index.Exclude ?? []);
+        => a with { Index = b.Index } == b
+            && a.Index with { Exclude = b.Index.Exclude } == b.Index
+            && (a.Index.Exclude ?? []).SequenceEqual(b.Index.Exclude ?? []);
 
     /// <summary>
     /// Saves a language choice on top of <see cref="Current"/> at this moment, so settings another window saved while the
