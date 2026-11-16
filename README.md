@@ -18,10 +18,22 @@ favorite, and find files by name across your local drives from Mandrill's own in
   with the standard Windows progress and conflict dialogs and undo, clipboard and drag and drop with File Explorer,
   and the usual keyboard shortcuts.
 - **Light, dark and high contrast**: follows the Windows theme, or pick light or dark in Settings.
-- **UI languages**: English, Korean, Japanese, Chinese (Simplified) and Chinese (Traditional). Mandrill follows the
-  Windows display language, or pick one with **File → Language…** (applies after a restart).
+- **UI languages**: five languages, see [Supported languages](#supported-languages).
 - **Private**: no telemetry and no administrator rights. The only network access is the manual "Check for updates"
   button in About, which asks GitHub for the latest release.
+
+## Supported languages
+
+| Language | Native name |
+|---|---|
+| English (United States) | English (United States) |
+| Japanese (Japan) | 日本語 (日本) |
+| Korean (South Korea) | 한국어(대한민국) |
+| Chinese (Simplified) | 中文 (简体) |
+| Chinese (Traditional) | 中文 (繁體) |
+
+Change the language with **File → Language…**. The default, **Auto (Windows language)**, follows the Windows display
+language. A new language applies after Mandrill restarts.
 
 ## Install
 
@@ -48,7 +60,7 @@ is not required. The installer needs [Inno Setup 6](https://jrsoftware.org/isinf
 dotnet build Mandrill.sln -c Release
 dotnet format Mandrill.sln --verify-no-changes
 dotnet publish src/Mandrill.App -c Release -r win-x64 --self-contained -o publish/
-& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 installer\Mandrill.iss
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.1 installer\Mandrill.iss
 ```
 
 `publish\Mandrill.exe` runs without installing. The installer is written to `dist\`. If Inno Setup is installed for
