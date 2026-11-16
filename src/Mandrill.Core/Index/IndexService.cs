@@ -106,6 +106,7 @@ public sealed class IndexService : IIndexService
 {
     private const long StatusThrottleMs = 250;
     private const string OwnerLockFile = "owner.lock";
+    private const int MaxReplayPaths = 100_000;
     private const int SharingViolation = unchecked((int)0x80070020);
 
     private readonly IndexServiceOptions _options;
@@ -149,6 +150,7 @@ public sealed class IndexService : IIndexService
     private bool _loadWanted;
     private bool _replaceLogged;
     private bool _lockWarned;
+    private readonly Dictionary<string, StaleDrive> _stale = new(PathUtil.Comparer); // a loaded reader's drives only the owner can bring up to date
 
     // Shared state.
     private DriveSegment[] _segments = [];
@@ -173,6 +175,8 @@ public sealed class IndexService : IIndexService
     private ITimer? _applyTimer;
     private ITimer? _ownerTimer;
     private TaskCompletionSource? _loaded;
+    private TaskCompletionSource? _refresh; // the queued refresh of a loaded reader (callers share it)
+    private bool _loadedReader;
 
     /// <summary>Creates the service; nothing runs until <see cref="Start"/>.</summary>
     /// <param name="options">Options.</param>
@@ -233,6 +237,17 @@ public sealed class IndexService : IIndexService
     {
         lock (_gate)
         {
+            if (_loadedReader && !_stopping)
+            {
+                if (_refresh is null)
+                {
+                    _refresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    Enqueue(new RefreshCommand());
+                }
+
+                return _refresh.Task;
+            }
+
             if (_loaded is null)
             {
                 _loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -356,6 +371,7 @@ public sealed class IndexService : IIndexService
             _applyTimer?.Dispose();
             _ownerTimer?.Dispose();
             _loaded?.TrySetResult(); // nothing loads any more
+            _refresh?.TrySetResult();
         }
 
         CancelBuild();
@@ -479,7 +495,8 @@ public sealed class IndexService : IIndexService
         PublishStatus(force: true);
         if (!restart)
         {
-            CompleteLoaded(); // no thread runs a queued load any more
+            CompleteLoaded(); // no thread runs a queued load or refresh any more
+            CompleteRefresh();
             ReleaseOwnerLock(); // nobody maintains the index here any more: let another instance take over
             _stopped.TrySetResult(); // stays in Error; the segments stay searchable
         }
@@ -529,6 +546,9 @@ public sealed class IndexService : IIndexService
                 break;
             case OwnerRetryCommand:
                 TryTakeOwnership();
+                break;
+            case RefreshCommand:
+                RefreshReader();
                 break;
             case BuildCommand build:
                 _pendingBuilds.Remove(build.Root);
@@ -634,6 +654,11 @@ public sealed class IndexService : IIndexService
                         Environment.WorkingSet >> 20);
                     Publish(segment);
                     _loadedStamps[root] = stamp;
+                    if (_reader && !segment.IsComplete)
+                    {
+                        MarkStale(root); // the owner is still building it: refreshed from its later saves
+                    }
+
                     _segmentExclude[root] = Mine(_appliedExclude, root); // saved with the list of that time; a settings change re-diffs
                     _logger.LogInformation("Index {Root} loaded: {Items} items, complete {Complete}", root, segment.Count, segment.IsComplete);
                     if (!segment.IsComplete)
@@ -967,6 +992,10 @@ public sealed class IndexService : IIndexService
         {
             _perf.LogInformation("Index overflow {Root}: changes dropped, a verify follows (at most every {Minutes} min)", root, (int)_options.OverflowVerifyInterval.TotalMinutes);
             _overflowPending.Add(root);
+            if (_reader)
+            {
+                MarkStale(root); // the owner's verify brings it back: refreshed from its next save
+            }
         }
 
         bool any = false;
@@ -993,6 +1022,7 @@ public sealed class IndexService : IIndexService
                 _replay?.UnionWith(paths);
             }
 
+            RecordForReplay(root, paths);
             long applyStart = Stopwatch.GetTimestamp();
             any |= ApplyPaths(segment, paths, firstSeen);
             if (paths.Count > 0)
@@ -1137,6 +1167,11 @@ public sealed class IndexService : IIndexService
             if (built.Any(p => !mine.Contains(p, PathUtil.Comparer)))
             {
                 QueueBuild(segment.Root, verify: segment.IsComplete); // "removing schedules a scan" (AC-2.10)
+                if (_reader)
+                {
+                    MarkStale(segment.Root); // only the owner rescans: refreshed from its next save
+                }
+
                 rescans++;
             }
 
@@ -1203,6 +1238,7 @@ public sealed class IndexService : IIndexService
         {
             _dirty.Add(segment.Root);
             _lastUpdatedUtc = _options.Time.GetUtcNow().UtcDateTime;
+            RecordForReplay(segment.Root, [normalized]);
         }
     }
 
@@ -1339,8 +1375,134 @@ public sealed class IndexService : IIndexService
         }
         finally
         {
+            lock (_gate)
+            {
+                _loadedReader = _reader; // from now on each search open refreshes it
+            }
+
             CompleteLoaded();
         }
+    }
+
+    // Search open on a loaded reader (§18 D2): drives the owner listed since appear, and a stale drive the owner saved since
+    // is reloaded with this reader's own changes replayed onto it. Complete, current drives are left alone.
+    private void RefreshReader()
+    {
+        TaskCompletionSource? done;
+        lock (_gate)
+        {
+            done = _refresh; // a search opened while this runs queues the next refresh
+            _refresh = null;
+        }
+
+        try
+        {
+            if (!_reader || _standby)
+            {
+                return; // took over meanwhile
+            }
+
+            _manifest = new Dictionary<string, DriveIndexInfo>(IndexManifest.Read(_options.IndexDirectory, _logger).Drives, StringComparer.OrdinalIgnoreCase);
+            foreach (DriveDescriptor drive in _options.Drives.Current.Where(Indexed))
+            {
+                LoadOrQueue(drive.Root); // loads only drives without a segment
+            }
+
+            foreach (var (root, stale) in _stale.ToList())
+            {
+                if (Find(root) is not { } segment)
+                {
+                    _stale.Remove(root); // drive removed
+                    continue;
+                }
+
+                if (!_manifest.TryGetValue(LetterOf(root), out DriveIndexInfo? info) || info.VolumeSerial != segment.VolumeSerial)
+                {
+                    continue;
+                }
+
+                if (SavedSince(segment, info, out (DateTime, long)? stamp) && Reload(segment, info, stamp) is { } fresh)
+                {
+                    if (stale.Applied is { Count: > 0 } applied)
+                    {
+                        ApplyPaths(fresh, applied); // this reader's changes since it went stale, newer than the owner's save
+                    }
+
+                    segment = fresh;
+                    _logger.LogInformation("Index {Root} refreshed from the owner's save: {Items} items, complete {Complete}", root, fresh.Count, fresh.IsComplete);
+                }
+
+                if (segment.IsComplete && LastPass(info) is { } pass && pass >= stale.Since)
+                {
+                    _stale.Remove(root); // the owner has seen everything since it went stale
+                }
+            }
+        }
+        finally
+        {
+            done?.TrySetResult();
+        }
+    }
+
+    private void CompleteRefresh()
+    {
+        lock (_gate)
+        {
+            _refresh?.TrySetResult();
+        }
+    }
+
+    // A loaded reader cannot bring this drive up to date itself (incomplete, overflowed, an exclude removed).
+    private void MarkStale(string root)
+    {
+        DateTime now = _options.Time.GetUtcNow().UtcDateTime;
+        if (_stale.TryGetValue(root, out StaleDrive? stale))
+        {
+            stale.Since = now; // the owner must have passed this later point too; the applied set already covers since
+        }
+        else
+        {
+            _stale[root] = new StaleDrive(now);
+        }
+    }
+
+    // Paths this reader applies to a stale drive are replayed onto the owner's version when it is reloaded.
+    private void RecordForReplay(string root, IEnumerable<string> paths)
+    {
+        if (!_stale.TryGetValue(root, out StaleDrive? stale) || stale.Applied is not { } applied)
+        {
+            return;
+        }
+
+        applied.UnionWith(paths);
+        if (applied.Count > MaxReplayPaths)
+        {
+            stale.Applied = null;
+            _logger.LogWarning("Index {Root}: over {Max} changed paths while waiting for the owner; they are missing here until this instance owns the index or restarts", root, MaxReplayPaths);
+        }
+    }
+
+    // The owner replaced the drive's file since this instance loaded it (write time + length, recorded before the load).
+    private bool SavedSince(DriveSegment segment, DriveIndexInfo info, out (DateTime, long)? stamp)
+    {
+        stamp = Stamp(Path.Combine(_options.IndexDirectory, info.File));
+        return stamp is not null && stamp != _loadedStamps.GetValueOrDefault(segment.Root);
+    }
+
+    // Loads the drive's saved file again and swaps it in (the old segment serves search until then); null when unusable.
+    private DriveSegment? Reload(DriveSegment segment, DriveIndexInfo info, (DateTime, long)? stamp)
+    {
+        IndexLoadResult loaded = IndexFile.Load(Path.Combine(_options.IndexDirectory, info.File), segment.VolumeSerial);
+        if (loaded.Segment is not { } fresh || !PathUtil.PathEquals(fresh.Root, segment.Root))
+        {
+            _logger.LogWarning("Index file {File} not reloaded ({Reason}); keeping the loaded copy", info.File, loaded.Failure);
+            return null;
+        }
+
+        Replace(segment, fresh);
+        _loadedStamps[segment.Root] = stamp;
+        _segmentExclude[segment.Root] = Mine(_appliedExclude, segment.Root);
+        return fresh;
     }
 
     // Also before any EnsureLoadedAsync call: a later call then finds a completed task and queues nothing.
@@ -1361,10 +1523,12 @@ public sealed class IndexService : IIndexService
         }
 
         _reader = false;
+        _stale.Clear(); // the owner verifies instead
         _logger.LogInformation("Index ownership taken (pid {Pid})", Environment.ProcessId);
         int hours = SafeSettings().RescanHours;
         lock (_gate)
         {
+            _loadedReader = false;
             _ownerTimer?.Dispose();
             _ownerTimer = null;
             if (!_stopping)
@@ -1411,25 +1575,21 @@ public sealed class IndexService : IIndexService
                 continue;
             }
 
-            string file = Path.Combine(_options.IndexDirectory, info.File);
-            (DateTime, long)? stamp = Stamp(file);
-            if (stamp is null || stamp == _loadedStamps.GetValueOrDefault(segment.Root))
+            if (!SavedSince(segment, info, out (DateTime, long)? stamp))
             {
                 continue;
             }
 
-            IndexLoadResult loaded = IndexFile.Load(file, segment.VolumeSerial);
-            if (loaded.Segment is { } fresh && PathUtil.PathEquals(fresh.Root, segment.Root))
+            if (Reload(segment, info, stamp) is { } fresh)
             {
-                Replace(segment, fresh);
-                _loadedStamps[segment.Root] = stamp;
-                _segmentExclude[segment.Root] = Mine(_appliedExclude, segment.Root);
                 _dirty.Remove(segment.Root);
-                _logger.LogInformation("Index {Root} reloaded after the previous owner's save: {Items} items", segment.Root, fresh.Count);
+                // The reload dropped what this instance applied, and changes made between the old owner's last save and
+                // now reached nobody: verify at once, even when the old owner verified it moments ago (§18 D2).
+                QueueBuild(segment.Root, verify: fresh.IsComplete);
+                _logger.LogInformation("Index {Root} reloaded after the previous owner's save: {Items} items; verifying it", segment.Root, fresh.Count);
             }
             else
             {
-                _logger.LogWarning("Index file {File} not reloaded ({Reason}); keeping the loaded copy", info.File, loaded.Failure);
                 _dirty.Add(segment.Root);
             }
         }
@@ -1576,6 +1736,7 @@ public sealed class IndexService : IIndexService
             : _buildRoot is not null ? (PauseHeld() ? IndexState.Paused : IndexState.Scanning)
             : _loading ? IndexState.Loading
             : _pendingBuilds.Count > 0 ? IndexState.Scanning
+            : _reader && Segments.Any(s => !s.IsComplete) ? IndexState.Scanning // the owner is still building it
             : IndexState.Ready;
         string? message = _failed ? _errorMessage : _buildRoot;
         var status = new IndexStatus(state, Segments.Sum(s => (long)s.Count), _buildRoot is null ? null : _buildPercent, _lastUpdatedUtc, _saveFailed, message);
@@ -1629,6 +1790,16 @@ public sealed class IndexService : IIndexService
     private sealed record EnsureLoadedCommand : Command;
 
     private sealed record OwnerRetryCommand : Command;
+
+    private sealed record RefreshCommand : Command;
+
+    // A loaded reader's drive that only the owner can bring up to date: since when, and the paths applied here since then.
+    private sealed class StaleDrive(DateTime since)
+    {
+        public DateTime Since { get; set; } = since;
+
+        public HashSet<string>? Applied { get; set; } = new(PathUtil.Comparer); // null once over MaxReplayPaths
+    }
 
     private sealed record BuildCommand(string Root, bool Verify) : Command;
 

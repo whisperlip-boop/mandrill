@@ -57,10 +57,12 @@ public interface IIndexService : ISearchIndex, IDisposable
     void ApplySettings();
 
     /// <summary>
-    /// Completes when the index is usable for search: a Standby reader loads the saved index once (later calls do not
-    /// reload); otherwise at once, or after the start-up load. Any thread; never faults.
+    /// Call when a search opens; completes when the index is usable for it. A Standby reader loads the saved index (calls
+    /// until that load ends share its task); a loaded reader refreshes the drives only the owner can bring up to date (one
+    /// refresh queued at a time, shared by the calls meanwhile); the owner completes at once, or after its start-up load.
+    /// Any thread; never faults.
     /// </summary>
-    /// <returns>The same task for every call.</returns>
+    /// <returns>A task that completes when the load or refresh this call waits for is done.</returns>
     Task EnsureLoadedAsync();
 
     /// <summary>Starts the index thread (idempotent).</summary>
