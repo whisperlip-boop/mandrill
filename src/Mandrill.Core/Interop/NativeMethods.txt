@@ -170,3 +170,5 @@ IShellItemImageFactory
 SIIGBF
 GetObject
 BITMAP
+// Thumbnails for every type with a registered thumbnail handler (MicroDicom .dcm, video, Office)
+AssocQueryString

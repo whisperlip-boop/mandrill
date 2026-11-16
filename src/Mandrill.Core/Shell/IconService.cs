@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Mandrill.Core.IO;
 using Mandrill.Core.Platform;
 using Mandrill.Core.Watching;
@@ -10,8 +11,8 @@ namespace Mandrill.Core.Shell;
 /// <summary>
 /// Shell icons for list rows (AC-1.14, architecture §3/§9): per type by default, per item (<see cref="IconKey.UniquePath"/>)
 /// for .exe/.lnk/.ico/.url/.cur/.ani/.scr/.cpl/.msc, folders with ReadOnly/System attributes (desktop.ini icons) and
-/// reparse points, which also get the shell's link overlay, and image files at Large and Jumbo (their shell thumbnail,
-/// else the type icon; owner #7). Per-item lookups read the item, so they run only on fixed
+/// reparse points, which also get the shell's link overlay, and at Large and Jumbo files of a type with a thumbnail handler
+/// (their shell thumbnail, else the type icon; owner #7). Per-item lookups read the item, so they run only on fixed
 /// drives and for paths shorter than 260 characters; elsewhere the by-type icon is used. Misses are resolved one at a
 /// time on the "icons" STA, newest request first, into a byte-bounded LRU. A lookup that throws or times out keeps the
 /// placeholder for <see cref="FailureCooldown"/> and is then retried (at most <see cref="MaxAttempts"/> times, so a handler
@@ -36,8 +37,7 @@ public sealed class IconService : IIconService, IDisposable
     private static readonly TimeSpan DriveRefresh = TimeSpan.FromSeconds(5);
     private static readonly string[] PerItemExtensions = [".exe", ".lnk", ".ico", ".url", ".cur", ".ani", ".scr", ".cpl", ".msc"];
 
-    // shortcut: image types Windows thumbnails out of the box; other thumbnail handlers (video, PDF, Office) keep the type
-    // icon. Upgrade by asking the registry for an IThumbnailProvider per type if the owner wants those too.
+    // Image types Windows thumbnails out of the box: thumbnailed even if the handler lookup says otherwise.
     private static readonly string[] ThumbnailExtensions = [".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".bmp", ".dib", ".gif", ".tif", ".tiff", ".webp", ".heic", ".heif", ".avif", ".jxr", ".wdp"];
 
     private readonly ShellSta _sta;
@@ -46,11 +46,16 @@ public sealed class IconService : IIconService, IDisposable
     private readonly Func<IReadOnlyList<DriveDescriptor>> _drives;
     private readonly TimeProvider _time;
     private readonly Func<IconKey, IconImage?> _resolve;
+    private readonly Func<string, bool> _hasThumbnailHandler;
     private readonly TimeSpan _iconTimeout;
     private readonly long _maxBytes;
     private readonly ILogger _logger;
     private readonly HashSet<int> _perItemExtIds;
-    private readonly HashSet<int> _thumbnailExtIds;
+
+    // Extension id -> its files get thumbnails at Large and up. Seeded with the built-in image types (true) and the per-item
+    // types (false: they keep their own icon, though .ico and .lnk register handlers); any other type is decided once, on
+    // the STA, when its type icon is first resolved, and shows that type icon until then.
+    private readonly ConcurrentDictionary<int, bool> _thumbnailTypes;
     private readonly Lock _gate = new();
     private readonly Dictionary<IconKey, LinkedListNode<CacheEntry>> _cache = [];
     private readonly LinkedList<CacheEntry> _lru = new();
@@ -93,7 +98,7 @@ public sealed class IconService : IIconService, IDisposable
     {
     }
 
-    /// <summary>Test seam: drive list, clock, the STA-side lookup with its timeout, and the drive changes to follow.</summary>
+    /// <summary>Test seam: drive list, clock, the STA-side lookup with its timeout, the drive changes to follow, and the thumbnail-handler lookup.</summary>
     internal IconService(
         ShellSta sta,
         TypeNameCache typeNames,
@@ -104,7 +109,8 @@ public sealed class IconService : IIconService, IDisposable
         long maxCacheBytes,
         Func<IconKey, IconImage?>? resolve = null,
         TimeSpan? iconTimeout = null,
-        IDriveMonitor? monitor = null)
+        IDriveMonitor? monitor = null,
+        Func<string, bool>? hasThumbnailHandler = null)
     {
         _sta = sta ?? throw new ArgumentNullException(nameof(sta));
         _types = typeNames ?? throw new ArgumentNullException(nameof(typeNames));
@@ -115,8 +121,10 @@ public sealed class IconService : IIconService, IDisposable
         _maxBytes = maxCacheBytes;
         _logger = (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<IconService>();
         _perItemExtIds = PerItemExtensions.Select(e => _extensions.IdOf("x" + e)).ToHashSet();
-        _thumbnailExtIds = ThumbnailExtensions.Select(e => _extensions.IdOf("x" + e)).ToHashSet();
+        _thumbnailTypes = new(_perItemExtIds.Select(id => KeyValuePair.Create(id, false))
+            .Concat(ThumbnailExtensions.Select(e => KeyValuePair.Create(_extensions.IdOf("x" + e), true))));
         _resolve = resolve ?? Resolve;
+        _hasThumbnailHandler = hasThumbnailHandler ?? ShellIconReader.HasThumbnailHandler;
         _iconTimeout = iconTimeout ?? DefaultIconTimeout;
         _types.TypeNamesReady += OnTypeNamesReady;
         _sta.Replaced += OnStaReplaced;
@@ -438,7 +446,14 @@ public sealed class IconService : IIconService, IDisposable
             bool failed = false;
             try
             {
-                image = await _sta.InvokeAsync(() => _resolve(key), _iconTimeout, ct).ConfigureAwait(false);
+                image = await _sta.InvokeAsync(
+                    () =>
+                    {
+                        DecideThumbnails(key);
+                        return _resolve(key);
+                    },
+                    _iconTimeout,
+                    ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -459,6 +474,21 @@ public sealed class IconService : IIconService, IDisposable
 
             Store(key, image, failed, epoch);
         }
+    }
+
+    // STA thread: before a type's icon is first reported, so the rows that asked for it (IconsReady) ask again and get
+    // thumbnail keys if the type has a handler.
+    private void DecideThumbnails(IconKey key)
+    {
+        if (key.UniquePath is not null || key.ExtId <= 0 || _thumbnailTypes.ContainsKey(key.ExtId))
+        {
+            return;
+        }
+
+        string extension = _extensions.ExtensionOf(key.ExtId);
+        bool thumbnails = _hasThumbnailHandler(extension);
+        _thumbnailTypes[key.ExtId] = thumbnails;
+        _logger.LogDebug("Thumbnails for {Extension}: {Decision}", extension, thumbnails ? "handler registered" : "no handler, type icon");
     }
 
     // STA thread.
@@ -538,7 +568,7 @@ public sealed class IconService : IIconService, IDisposable
     }
 
     // Explorer shows thumbnails from "medium icons" (48) up; smaller sizes keep the type icon (owner #7).
-    private bool IsThumbnail(int extId, IconSize size) => size >= IconSize.Large && _thumbnailExtIds.Contains(extId);
+    private bool IsThumbnail(int extId, IconSize size) => size >= IconSize.Large && _thumbnailTypes.GetValueOrDefault(extId);
 
     private static SHSTOCKICONID? StockIdOf(int extId) => extId switch
     {

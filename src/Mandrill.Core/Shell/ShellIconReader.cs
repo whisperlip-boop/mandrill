@@ -145,6 +145,27 @@ internal static class ShellIconReader
     }
 
     /// <summary>
+    /// True when the type has a thumbnail handler through its association (extension, ProgID, SystemFileAssociations,
+    /// perceived type): IThumbnailProvider, or the older IExtractImage (MicroDicom's .dcm). Registry only, loads no handler.
+    /// </summary>
+    /// <param name="extension">Extension with the dot (".dcm").</param>
+    /// <returns>True when Explorer would ask a handler for a thumbnail.</returns>
+    public static bool HasThumbnailHandler(string extension)
+    {
+        foreach (string iid in (ReadOnlySpan<string>)["{e357fccd-a995-4576-b01f-234630154e96}", "{BB2E617C-0920-11d1-9A0B-00C04FC2D6C1}"])
+        {
+            uint length = 0;
+            // Without a buffer the call only measures: S_FALSE when the handler exists, ERROR_NO_ASSOCIATION when not.
+            if (PInvoke.AssocQueryString(ASSOCF.ASSOCF_INIT_IGNOREUNKNOWN, ASSOCSTR.ASSOCSTR_SHELLEXTENSION, extension, iid, null, ref length).Succeeded)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// The shell thumbnail of a file (owner #7), fitted into <paramref name="pixels"/> square with its aspect ratio, as
     /// premultiplied BGRA. Thumbnail only: a type without a thumbnail handler gives null, and the caller shows the icon.
     /// Reads the file (thumbnail cache or decoder), so callers run it under a timeout.
