@@ -1,3 +1,4 @@
+using System.Globalization;
 using Mandrill.Core.Localization;
 using Mandrill.Core.Platform;
 using Mandrill.Core.State;
@@ -8,8 +9,11 @@ using Windows.Win32.System.Diagnostics.Debug;
 
 namespace Mandrill.Core.Diagnostics;
 
-/// <summary>Services created by <see cref="AppBootstrap.StartAsync"/>. The caller owns and disposes <see cref="LoggerFactory"/>.</summary>
-public sealed class BootstrapResult
+/// <summary>
+/// Services created by <see cref="AppBootstrap.StartAsync"/>. The caller owns and disposes <see cref="LoggerFactory"/>;
+/// <see cref="Dispose"/> releases the instance number (the app keeps it for its lifetime, the OS frees it at exit).
+/// </summary>
+public sealed class BootstrapResult : IDisposable
 {
     /// <summary>Creates the result.</summary>
     /// <param name="paths">Resolved application paths.</param>
@@ -46,6 +50,15 @@ public sealed class BootstrapResult
 
     /// <summary>The language "auto" resolves to on this PC (the picker's Auto cell).</summary>
     public string AutoLanguage { get; init; } = Localizer.English;
+
+    /// <summary>This process's instance number: the lowest free 1..8 among running instances, 0 when none was free.</summary>
+    public int InstanceSlot { get; init; }
+
+    // instance-<n>.lock held open without sharing: the number stays taken until disposed or the process ends.
+    internal FileStream? InstanceLock { get; init; }
+
+    /// <summary>Releases the instance number.</summary>
+    public void Dispose() => InstanceLock?.Dispose();
 }
 
 /// <summary>Settings and session loaded at startup (AC-1.33, AC-1.34), with the stores that save them later.</summary>
@@ -86,7 +99,7 @@ public static class AppBootstrap
         // Not-ready removable media (empty card reader) must fail the call, not show a modal "insert a disk" box (SetErrorMode
         // docs: best practice for every application).
         PInvoke.SetErrorMode((THREAD_ERROR_MODE)PInvoke.GetErrorMode() | THREAD_ERROR_MODE.SEM_FAILCRITICALERRORS);
-        var (factory, fileLogging, log) = StartLogging(paths);
+        var (factory, fileLogging, log, slot, slotLock) = StartLogging(paths);
         var settingsStore = new StateStore<AppSettings>(paths.SettingsFile, factory.CreateLogger("Mandrill.State.Settings"));
         var sessionStore = new StateStore<SessionState>(paths.SessionFile, factory.CreateLogger("Mandrill.State.Session"));
         var favoritesStore = new StateStore<FavoritesDocument>(paths.FavoritesFile, factory.CreateLogger("Mandrill.State.Favorites"));
@@ -111,17 +124,23 @@ public static class AppBootstrap
         {
             Languages = languages,
             AutoLanguage = auto,
+            InstanceSlot = slot,
+            InstanceLock = slotLock,
         };
     }
 
-    private static (ILoggerFactory Factory, bool FileLogging, ILogger Log) StartLogging(AppPaths paths)
+    private static (ILoggerFactory Factory, bool FileLogging, ILogger Log, int Slot, FileStream? SlotLock) StartLogging(AppPaths paths)
     {
         ILoggerFactory factory;
         bool fileLogging = true;
+        int slot = 0;
+        FileStream? slotLock = null;
         try
         {
             paths.EnsureCreated();
-            factory = MandrillLogging.Create(paths.LogFile, MandrillLogging.IsDebugEnabled);
+            (slot, slotLock) = TakeInstanceSlot(paths.DataDirectory);
+            ProbeLogFile(paths.LogFile);
+            factory = MandrillLogging.Create(paths.LogFile, MandrillLogging.IsDebugEnabled, slot);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -131,7 +150,7 @@ public static class AppBootstrap
         }
 
         var log = factory.CreateLogger(typeof(AppBootstrap).FullName!);
-        log.LogInformation("Mandrill starting: version {Version}, OS {OS}, data {Data}", typeof(AppBootstrap).Assembly.GetName().Version, Environment.OSVersion, paths.DataDirectory);
+        log.LogInformation("Mandrill starting: version {Version}, OS {OS}, pid {Pid}, instance {Slot}, data {Data}", typeof(AppBootstrap).Assembly.GetName().Version, Environment.OSVersion, Environment.ProcessId, slot, paths.DataDirectory);
         if (paths.IsOverridden)
         {
             log.LogInformation("Data directory overridden by {Variable}: {Data}", AppPaths.DataDirectoryVariable, paths.DataDirectory);
@@ -147,7 +166,47 @@ public static class AppBootstrap
             log.LogWarning("%APPDATA% is unavailable; settings and logs are stored in {Data} instead", paths.DataDirectory);
         }
 
-        return (factory, fileLogging, log);
+        return (factory, fileLogging, log, slot, slotLock);
+    }
+
+    // Lowest free instance-<n>.lock in 1..8 (architecture §18 D1); counting processes would race when two start at once.
+    private static (int Slot, FileStream? Lock) TakeInstanceSlot(string dataDirectory)
+    {
+        for (int n = 1; n <= 8; n++)
+        {
+            try
+            {
+                string file = Path.Combine(dataDirectory, string.Create(CultureInfo.InvariantCulture, $"instance-{n}.lock"));
+                return (n, new FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Held by a running instance (or not writable): try the next number.
+            }
+        }
+
+        return (0, null);
+    }
+
+    // "Cannot write" is for a real failure only: a viewer holding the file (sharing violation) just delays the writer.
+    private static void ProbeLogFile(string logFile)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                SharedFileLoggerProvider.Open(logFile).Dispose();
+                return;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or DirectoryNotFoundException && attempt < 3)
+            {
+                Thread.Sleep(100);
+            }
+            catch (IOException ex) when (ex is not DirectoryNotFoundException)
+            {
+                return;
+            }
+        }
     }
 
     private static (Localizer Localizer, LanguageInfo[] Languages, string AutoLanguage) LoadLocalizer(AppPaths paths, ILoggerFactory factory, ILogger log, string setting)

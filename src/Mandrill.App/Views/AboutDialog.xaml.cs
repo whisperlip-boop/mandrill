@@ -23,7 +23,6 @@ public sealed partial class AboutDialog : ContentDialog
         "Windows App SDK / WinUI 3 — MIT",
         "CommunityToolkit.WinUI.Controls.Sizers, CommunityToolkit.Mvvm — MIT",
         "Microsoft.Extensions.Logging — MIT",
-        "NReco.Logging.File — MIT",
     ];
 
     /// <summary>Creates the dialog.</summary>

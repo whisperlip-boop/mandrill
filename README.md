@@ -71,4 +71,4 @@ all users, `ISCC.exe` is in `C:\Program Files (x86)\Inno Setup 6\`.
 MIT, see [LICENSE](LICENSE).
 
 Mandrill uses these components, each under the MIT license: Windows App SDK / WinUI 3, CommunityToolkit.WinUI.Controls.Sizers,
-CommunityToolkit.Mvvm, Microsoft.Extensions.Logging and NReco.Logging.File.
+CommunityToolkit.Mvvm and Microsoft.Extensions.Logging.

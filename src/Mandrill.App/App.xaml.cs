@@ -481,7 +481,7 @@ public sealed partial class App : Application
         }
     }
 
-    // Disposing the factory flushes NReco's background writer; later log calls go nowhere.
+    // Disposing the factory flushes the log writer's queue (up to 1 s); later log calls go nowhere.
     private void FlushLog()
     {
         _log = NullLogger.Instance;

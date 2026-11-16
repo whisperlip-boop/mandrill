@@ -1,10 +1,13 @@
 using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using NReco.Logging.File;
 
 namespace Mandrill.Core.Diagnostics;
 
-/// <summary>Logging bootstrap: rolling file %APPDATA%\mandrill\logs\mandrill.log (5 MB × 3), UTC, thread id, category.</summary>
+/// <summary>
+/// Logging bootstrap: %APPDATA%\mandrill\logs\mandrill.log shared by every instance (5 MB × 3, <see cref="SharedFileLoggerProvider"/>),
+/// UTC, pid and instance number, thread id, category.
+/// </summary>
 public static class MandrillLogging
 {
     /// <summary>Category for timing measurements.</summary>
@@ -28,31 +31,26 @@ public static class MandrillLogging
     /// <summary>Creates the logger factory. The log directory must exist (<see cref="AppPaths.EnsureCreated"/>).</summary>
     /// <param name="logFile">Path of the active log file.</param>
     /// <param name="debug">True to log at Debug level.</param>
+    /// <param name="instance">This process's instance number (line tag; 0 = none).</param>
     /// <returns>A factory the caller disposes on shutdown (flushes the file).</returns>
-    public static ILoggerFactory Create(string logFile, bool debug)
+    public static ILoggerFactory Create(string logFile, bool debug, int instance = 0)
     {
+        var provider = new SharedFileLoggerProvider(logFile, instance);
         return LoggerFactory.Create(builder =>
         {
             builder.SetMinimumLevel(debug ? LogLevel.Debug : LogLevel.Information);
-            builder.AddFile(logFile, options =>
-            {
-                options.Append = true;
-                options.FileSizeLimitBytes = FileSizeLimitBytes;
-                options.MaxRollingFiles = MaxRollingFiles;
-                options.FormatLogEntry = Format;
-            });
+            // Registered through a factory so the container disposes it with the logger factory (that flushes the queue).
+            builder.Services.AddSingleton<ILoggerProvider>(_ => provider);
         });
     }
 
-    /// <summary>Formats one entry: UTC timestamp, level, thread id, category, message, exception.</summary>
-    /// <param name="message">The entry.</param>
-    /// <returns>The line(s) to write.</returns>
-    public static string Format(LogMessage message)
+    /// <summary>Formats one entry: UTC timestamp, level, pid#instance, thread id, category, message, exception.</summary>
+    internal static string Format(LogLevel level, string tag, string category, string message, Exception? exception)
     {
         string line = string.Create(
             CultureInfo.InvariantCulture,
-            $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ} {LevelText(message.LogLevel)} [{Environment.CurrentManagedThreadId}] {message.LogName}: {message.Message}");
-        return message.Exception is null ? line : line + Environment.NewLine + message.Exception;
+            $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ} {LevelText(level)} [{tag} {Environment.CurrentManagedThreadId}] {category}: {message}");
+        return exception is null ? line : line + Environment.NewLine + exception;
     }
 
     private static string LevelText(LogLevel level) => level switch
