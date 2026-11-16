@@ -458,8 +458,9 @@ public sealed partial class MainWindow : Window
         // the Settings dialog) only this one is reached, so it opens the active pane's search (owner stage 3 #1).
         Shortcut(VirtualKey.F, VirtualKeyModifiers.Control, () => PaneArea.ActiveView?.RequestSearch());
 
-        // File > New window (§18 D7); Ctrl+Shift+N stays the panes' New folder.
-        Shortcut(VirtualKey.N, VirtualKeyModifiers.Control, () => Run(ViewModel.NewWindowCommand));
+        // File > New window (§18 D7); Ctrl+Shift+N stays the panes' New folder. Not while typing (a rename, the path box, a
+        // dialog's text box): the text keeps the key and nothing in progress is disturbed (lead, QA MI).
+        Shortcut(VirtualKey.N, VirtualKeyModifiers.Control, () => Run(ViewModel.NewWindowCommand), inTextFields: false);
     }
 
     private void Shortcut(VirtualKey key, VirtualKeyModifiers modifiers, Action action, bool inTextFields = true)
@@ -478,8 +479,12 @@ public sealed partial class MainWindow : Window
         Root.KeyboardAccelerators.Add(accelerator);
     }
 
-    private bool IsTextFieldFocused()
-        => Content?.XamlRoot is { } root && FocusManager.GetFocusedElement(root) is TextBox or PasswordBox or RichEditBox;
+    private bool IsTextFieldFocused() => Content?.XamlRoot is { } root && IsTextField(FocusManager.GetFocusedElement(root));
+
+    /// <summary>True for an element that takes typed text: shortcuts marked "not in text fields" leave it the key.</summary>
+    /// <param name="focused">The focused element.</param>
+    /// <returns>True for a TextBox, PasswordBox or RichEditBox.</returns>
+    public static bool IsTextField(object? focused) => focused is TextBox or PasswordBox or RichEditBox;
 
     private static void Run(System.Windows.Input.ICommand command)
     {
