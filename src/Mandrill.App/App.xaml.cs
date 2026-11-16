@@ -90,7 +90,11 @@ public sealed partial class App : Application
             PerfLog.Mark("services created");
 
             var icons = new Icons.IconProvider(boot.LoggerFactory.CreateLogger<Icons.IconProvider>());
-            var viewModel = new MainViewModel(boot.LoggerFactory.CreateLogger<MainViewModel>()) { ShowHidden = hidden.ShowHidden };
+            var viewModel = new MainViewModel(boot.LoggerFactory.CreateLogger<MainViewModel>())
+            {
+                ShowHidden = hidden.ShowHidden,
+                StartNewWindow = () => Task.Run(() => AppRestart.StartNewInstance(_log, "new window")), // process start: off the UI thread
+            };
             AppTheme.SetPalette(settings.Current.Theme); // before any view is built, so none needs a refresh
 
             // shortcut: read once; a font change in Windows applies after a restart. Before any view (StaticResource).
@@ -442,7 +446,7 @@ public sealed partial class App : Application
 
         if (_restartOnClose)
         {
-            AppRestart.StartNewInstance(_log); // logs a failure; nothing is left on screen to report it in
+            AppRestart.StartNewInstance(_log, "restart"); // logs a failure; nothing is left on screen to report it in
         }
 
         FlushLog();

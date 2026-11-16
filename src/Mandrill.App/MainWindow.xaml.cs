@@ -82,6 +82,7 @@ public sealed partial class MainWindow : Window
         };
         // ExitHandler never throws (SessionCoordinator logs and closes), so this async void lambda cannot crash the process.
         ViewModel.ExitRequested += async (_, _) => await (ExitHandler?.Invoke() ?? CloseNow());
+        ViewModel.StatusRequested += ShowStatus;
         ViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.CurrentLayout))
@@ -456,6 +457,9 @@ public sealed partial class MainWindow : Window
         // The panes' Ctrl+F is scoped to the focused pane; with focus outside every pane (menu bar, favorites bar, back from
         // the Settings dialog) only this one is reached, so it opens the active pane's search (owner stage 3 #1).
         Shortcut(VirtualKey.F, VirtualKeyModifiers.Control, () => PaneArea.ActiveView?.RequestSearch());
+
+        // File > New window (§18 D7); Ctrl+Shift+N stays the panes' New folder.
+        Shortcut(VirtualKey.N, VirtualKeyModifiers.Control, () => Run(ViewModel.NewWindowCommand));
     }
 
     private void Shortcut(VirtualKey key, VirtualKeyModifiers modifiers, Action action, bool inTextFields = true)

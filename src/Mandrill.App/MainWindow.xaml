@@ -50,6 +50,12 @@
             </MenuBar.Resources>
             <MenuBarItem Title="{m:Tr Key=menu.file}" AccessKey="F">
                 <MenuFlyoutItem
+                    x:Name="NewWindowItem"
+                    Command="{x:Bind ViewModel.NewWindowCommand}"
+                    KeyboardAcceleratorTextOverride="Ctrl+N"
+                    Text="{m:Tr Key=menu.file.newWindow}" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
                     x:Name="SettingsItem"
                     Command="{x:Bind ViewModel.OpenSettingsCommand}"
                     Text="{m:Tr Key=menu.file.settings}" />

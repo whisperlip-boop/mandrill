@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Mandrill.Core.Localization;
 using Mandrill.Presentation.Layout;
 using Microsoft.Extensions.Logging;
 
@@ -34,6 +35,15 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Raised when the user chose About; the view opens the About dialog (WP-1.11).</summary>
     public event EventHandler? AboutRequested;
 
+    /// <summary>Raised with a localized message for the status bar.</summary>
+    public event Action<string>? StatusRequested;
+
+    /// <summary>
+    /// Starts another Mandrill window (File &gt; New window, Ctrl+N; architecture §18 D7); true when it started. Set by the
+    /// app; null opens nothing.
+    /// </summary>
+    public Func<Task<bool>>? StartNewWindow { get; set; }
+
     /// <summary>Current window layout (WP-1.10 applies it to the pane grid).</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddPaneCommand), nameof(RemovePaneCommand))]
@@ -67,6 +77,16 @@ public sealed partial class MainViewModel : ObservableObject
         Layout = layout;
         layout.LayoutChanged += OnLayoutChanged;
         OnLayoutChanged();
+    }
+
+    [RelayCommand]
+    private async Task NewWindowAsync()
+    {
+        _logger.LogInformation("New window requested");
+        if (StartNewWindow is not { } start || !await start().ConfigureAwait(true))
+        {
+            StatusRequested?.Invoke(Localizer.Current["error.newWindowFailed"]);
+        }
     }
 
     [RelayCommand]

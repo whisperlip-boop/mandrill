@@ -1,6 +1,7 @@
 {
   "app.title": "Mandrill",
   "menu.file": "File",
+  "menu.file.newWindow": "New window",
   "menu.file.settings": "Settings…",
   "menu.file.language": "Language…",
   "menu.file.exit": "Exit",
@@ -22,6 +23,7 @@
   "layout.4_grid": "4 panes, 2 × 2",
   "error.unexpected": "Unexpected error. See log.",
   "error.noDataDirectory": "Cannot write to {path}. Settings and logs will not be saved.",
+  "error.newWindowFailed": "Could not open a new window.",
   "pane.newFolder": "New folder",
   "pane.status.redirected": "{missing} no longer exists. Showing {path}.",
   "pane.status.driveRemoved": "Drive {drive} was removed. Showing This PC.",
