@@ -80,7 +80,7 @@ public enum ContextMenuOutcome
 
     /// <summary>
     /// The user chose the shell's New folder on a background with <see cref="ContextMenuRequest.CanRename"/>: the UI creates
-    /// the folder and starts its inline editor (Windows' own top-level item does nothing outside Explorer's view).
+    /// the folder and starts its inline editor (outside Explorer, Windows' own top-level item creates it in the parent folder).
     /// </summary>
     NewFolder,
 

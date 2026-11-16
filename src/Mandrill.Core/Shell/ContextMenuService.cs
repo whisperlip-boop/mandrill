@@ -42,7 +42,7 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     private const string OwnerClass = "MandrillContextMenuOwner";
 
     // The background menu's New folder items: the New submenu's Folder, and Windows 11's top-level item (an Explorer command
-    // added at WM_INITMENUPOPUP; it returns S_OK and creates nothing without Explorer's view).
+    // added at WM_INITMENUPOPUP; outside Explorer it creates "New folder" in the PARENT of the shown folder).
     // shortcut: that GUID was read from the menu on Windows 10.0.26300; if a build changes it, that item is a no-op again.
     private static readonly string[] NewFolderVerbs = ["NewFolder", "{0001DEAD-9BF7-4CFA-8A5C-DE8679340002}"];
 
