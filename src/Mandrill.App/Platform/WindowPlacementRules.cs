@@ -64,6 +64,17 @@ public static class WindowPlacementRules
         return saved with { X = saved.X + offset, Y = saved.Y + offset };
     }
 
+    /// <summary>
+    /// The normal bounds to save. A cascaded window (§18 D5) that still sits exactly where the cascade put it saves the
+    /// placement it started from: otherwise every start of a second window would add another offset.
+    /// </summary>
+    /// <param name="current">The window's normal bounds now.</param>
+    /// <param name="cascaded">Where the cascade put it; null when it was not cascaded.</param>
+    /// <param name="saved">The placement it started from.</param>
+    /// <returns>The bounds to save.</returns>
+    public static RectInt32 ToSave(RectInt32 current, RectInt32? cascaded, WindowPlacement? saved)
+        => cascaded == current && saved is { } s ? new RectInt32(s.X, s.Y, s.Width, s.Height) : current;
+
     /// <summary>A child window of <paramref name="size"/> centred over <paramref name="owner"/>, kept inside the owner's work area.</summary>
     /// <param name="owner">The owner window's bounds (physical pixels).</param>
     /// <param name="size">The child's size (physical pixels).</param>

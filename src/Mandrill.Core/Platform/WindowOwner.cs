@@ -6,9 +6,10 @@ using Windows.Win32.UI.WindowsAndMessaging;
 namespace Mandrill.Core.Platform;
 
 /// <summary>
-/// Window handle helpers for the App (no WinUI types here). Makes one top-level window owned by another (architecture §3 WP-2.2b: the search popup stays above the main window
-/// and minimizes with it). WinUI windows have no owner property, so this sets GWLP_HWNDPARENT; the App passes the window
-/// handles (no WinUI types here).
+/// Window handle helpers for the App, which passes the handles (no WinUI types here): <see cref="Set"/> makes one
+/// top-level window owned by another (architecture §3 WP-2.2b: the search popup stays above the main window and
+/// minimizes with it; WinUI windows have no owner property, so this sets GWLP_HWNDPARENT), <see cref="Scale"/> reads a
+/// window's DPI scale (§18 D5 cascade).
 /// </summary>
 public static class WindowOwner
 {

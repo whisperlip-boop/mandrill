@@ -27,6 +27,7 @@ public sealed class SessionCoordinator : IAsyncDisposable
     private readonly ILogger _logger;
     private readonly int _instanceSlot;
     private RectInt32? _normalBounds;
+    private RectInt32? _cascaded; // where the cascade put this window (§18 D5); null when it was not cascaded
     private CloseState _close;
 
     /// <summary>Creates the coordinator and starts tracking the window.</summary>
@@ -35,7 +36,7 @@ public sealed class SessionCoordinator : IAsyncDisposable
     /// <param name="state">Settings, session and stores loaded at startup.</param>
     /// <param name="loggerFactory">Logger factory.</param>
     /// <param name="instanceSlot">This process's instance number (<c>BootstrapResult.InstanceSlot</c>): the cascade offset.</param>
-    public SessionCoordinator(Window window, LayoutManager layout, StartupState state, ILoggerFactory loggerFactory, int instanceSlot = 1)
+    public SessionCoordinator(Window window, LayoutManager layout, StartupState state, ILoggerFactory loggerFactory, int instanceSlot)
     {
         _instanceSlot = instanceSlot;
         _window = window ?? throw new ArgumentNullException(nameof(window));
@@ -64,11 +65,15 @@ public sealed class SessionCoordinator : IAsyncDisposable
         // Placement is cosmetic: a failure here must never stop the app (it did: "Startup failed", WP-1.14).
         try
         {
+            // shortcut: the DPI of the display the window is created on, not of the saved placement's display; with mixed
+            // DPI the 32 px offset gets the other display's factor. Upgrade: the DPI of the monitor under the saved rect.
             double scale = WindowOwner.Scale(WinRT.Interop.WindowNative.GetWindowHandle(_window));
-            if (WindowPlacementRules.Fit(WindowPlacementRules.Cascade(saved, _instanceSlot, scale), DisplayWorkAreas()) is { } rect)
+            WindowPlacement placed = WindowPlacementRules.Cascade(saved, _instanceSlot, scale);
+            if (WindowPlacementRules.Fit(placed, DisplayWorkAreas()) is { } rect)
             {
                 _window.AppWindow.MoveAndResize(rect);
                 _normalBounds = rect;
+                _cascaded = placed == saved ? null : rect;
             }
         }
         catch (Exception ex)
@@ -196,6 +201,7 @@ public sealed class SessionCoordinator : IAsyncDisposable
             return null;
         }
 
+        r = WindowPlacementRules.ToSave(r, _cascaded, _state.Session.Window);
         return new WindowPlacement(r.X, r.Y, r.Width, r.Height, presenter is { State: OverlappedPresenterState.Maximized });
     }
 

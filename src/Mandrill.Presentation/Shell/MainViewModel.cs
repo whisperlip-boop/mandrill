@@ -15,6 +15,7 @@ public sealed partial class MainViewModel : ObservableObject
     private const int MaxPanes = 4;
     private readonly ILogger<MainViewModel> _logger;
     private bool _syncingLayout;
+    private long _lastNewWindow = long.MinValue / 2;
 
     /// <summary>Creates the view model.</summary>
     /// <param name="logger">Logger.</param>
@@ -82,6 +83,14 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task NewWindowAsync()
     {
+        // A held Ctrl+N repeats: one window per second at most, not one process per key repeat.
+        long now = Environment.TickCount64;
+        if (now - _lastNewWindow < 1000)
+        {
+            return;
+        }
+
+        _lastNewWindow = now;
         _logger.LogInformation("New window requested");
         if (StartNewWindow is not { } start || !await start().ConfigureAwait(true))
         {

@@ -39,10 +39,21 @@ public sealed class SettingsService
     /// <param name="settings">The reloaded, normalized settings.</param>
     public void ApplyExternal(AppSettings settings)
     {
-        Current = settings ?? throw new ArgumentNullException(nameof(settings));
+        ArgumentNullException.ThrowIfNull(settings);
+        if (Same(settings, Current))
+        {
+            return; // e.g. the catch-up reload at start: nothing changed, nothing to log or re-apply
+        }
+
+        Current = settings;
         _logger.LogInformation("Settings changed by another instance (theme {Theme}, favorites bar {Bar}, layouts {Two}/{Three})", settings.Theme, settings.ShowFavoritesBar, settings.LayoutDefaults.TwoPanes, settings.LayoutDefaults.ThreePanes);
         Changed?.Invoke();
     }
+
+    // Value equality: the exclude list compares by reference in the record.
+    private static bool Same(AppSettings a, AppSettings b)
+        => a.Language == b.Language && a.Theme == b.Theme && a.ShowFavoritesBar == b.ShowFavoritesBar && a.LayoutDefaults == b.LayoutDefaults
+            && a.Index.RescanHours == b.Index.RescanHours && (a.Index.Exclude ?? []).SequenceEqual(b.Index.Exclude ?? []);
 
     /// <summary>
     /// Saves a language choice on top of <see cref="Current"/> at this moment, so settings another window saved while the
