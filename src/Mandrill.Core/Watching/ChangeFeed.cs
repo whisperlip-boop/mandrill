@@ -2,6 +2,9 @@ using System.ComponentModel;
 using Mandrill.Core.IO;
 using Mandrill.Core.Platform;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32.SafeHandles;
+using Windows.Win32;
+using Windows.Win32.Storage.FileSystem;
 
 namespace Mandrill.Core.Watching;
 
@@ -38,6 +41,7 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
     private readonly TimeProvider _time;
     private readonly Action<Action> _runOnPool;
     private readonly ILogger _logger;
+    private readonly Func<string, string?> _finalPath;
     private readonly Lock _gate = new();
     private readonly Dictionary<string, RootState> _roots = new(PathUtil.Comparer);
     private readonly HashSet<DirSubscription> _polled = [];
@@ -52,7 +56,7 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
     }
 
     /// <summary>Creates the feed with explicit seams (tests).</summary>
-    internal ChangeFeed(IDriveMonitor drives, IRootWatcherFactory factory, TimeProvider timeProvider, Action<Action> runOnPool, ILogger logger)
+    internal ChangeFeed(IDriveMonitor drives, IRootWatcherFactory factory, TimeProvider timeProvider, Action<Action> runOnPool, ILogger logger, Func<string, string?>? finalPath = null)
     {
         ArgumentNullException.ThrowIfNull(drives);
         ArgumentNullException.ThrowIfNull(factory);
@@ -64,6 +68,7 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
         _time = timeProvider;
         _runOnPool = runOnPool;
         _logger = logger;
+        _finalPath = finalPath ?? FinalPath;
         _drives.Changed += OnDrivesChanged;
     }
 
@@ -78,6 +83,7 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
         if (IsFixed(root))
         {
             AttachToRoot(root, r => r.Dirs.Add(sub));
+            _runOnPool(() => ResolveRealDir(sub));
         }
         else
         {
@@ -173,6 +179,81 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
 
     // Upper-case drive root of a validated path ("c:\x" → "C:\").
     private static string RootOf(string path) => char.ToUpperInvariant(path[0]) + path[1..3];
+
+    // Once per subscription, on the pool: a folder shown through a junction or symlink (itself or an ancestor) gets its
+    // events under its real path, so the subscription matches that path too (and watches its drive). The subscriber keeps
+    // its own path. No real path (gone, denied, a UNC or volume target): watched as shown, as before.
+    private void ResolveRealDir(DirSubscription d)
+    {
+        string? real;
+        try
+        {
+            real = _finalPath(d.Dir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Resolving the real path of {Dir} failed; watching it as shown", d.Dir);
+            return;
+        }
+
+        if (real is null || PathUtil.PathEquals(real, d.Dir) || d.Disposed)
+        {
+            return;
+        }
+
+        string realRoot = RootOf(real);
+        _logger.LogInformation("Watching {Dir} through its real path {Real}", d.Dir, real);
+        if (realRoot == d.Root || !IsFixed(realRoot))
+        {
+            d.RealDir = real; // shortcut: a target on a non-fixed drive is not polled; F5 shows its changes
+            return;
+        }
+
+        AttachToRoot(realRoot, r =>
+        {
+            if (!d.Disposed)
+            {
+                d.RealDir = real;
+                d.RealRoot = realRoot;
+                r.Dirs.Add(d);
+            }
+        });
+    }
+
+    // The folder's path with every junction and symlink on it resolved, or null (gone, denied, or a target without a drive
+    // letter such as a UNC path or an unlettered volume, which no root watcher reports).
+    private static string? FinalPath(string dir)
+    {
+        using SafeFileHandle handle = PInvoke.CreateFile(
+            PathUtil.ToIo(dir),
+            0,
+            FILE_SHARE_MODE.FILE_SHARE_READ | FILE_SHARE_MODE.FILE_SHARE_WRITE | FILE_SHARE_MODE.FILE_SHARE_DELETE,
+            null,
+            FILE_CREATION_DISPOSITION.OPEN_EXISTING,
+            FILE_FLAGS_AND_ATTRIBUTES.FILE_FLAG_BACKUP_SEMANTICS,
+            null);
+        if (handle.IsInvalid)
+        {
+            return null;
+        }
+
+        char[] buffer = new char[1024];
+        uint length = PInvoke.GetFinalPathNameByHandle(handle, buffer, GETFINALPATHNAMEBYHANDLE_FLAGS.FILE_NAME_NORMALIZED);
+        if (length >= buffer.Length)
+        {
+            buffer = new char[length];
+            length = PInvoke.GetFinalPathNameByHandle(handle, buffer, GETFINALPATHNAMEBYHANDLE_FLAGS.FILE_NAME_NORMALIZED);
+        }
+
+        if (length == 0 || length >= buffer.Length)
+        {
+            return null;
+        }
+
+        string path = new(buffer, 0, (int)length);
+        path = path.StartsWith(@"\\?\", StringComparison.Ordinal) ? path[4..] : path;
+        return path.Length >= 3 && PathUtil.IsDriveRoot(path[..3]) ? NormalizeDir(path, nameof(dir)) : null;
+    }
 
     private bool IsFixed(string root)
         => _drives.Current.Any(d => d.Kind == DriveKind.Fixed && PathUtil.PathEquals(d.Root, root));
@@ -479,11 +560,12 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
 
         foreach (DirSubscription d in dirs)
         {
-            if (removed.Any(p => PathUtil.IsSameOrUnder(d.Dir, p)))
+            string? real = d.RealDir; // events inside a junction or symlink arrive under the target's path
+            if (removed.Any(p => PathUtil.IsSameOrUnder(d.Dir, p) || (real is not null && PathUtil.IsSameOrUnder(real, p))))
             {
                 result.Add((d, new DirChange(d.Dir, null, true)));
             }
-            else if (byParent.TryGetValue(d.Dir, out HashSet<string>? names))
+            else if (byParent.TryGetValue(d.Dir, out HashSet<string>? names) || (real is not null && byParent.TryGetValue(real, out names)))
             {
                 result.Add((d, new DirChange(d.Dir, names is null ? null : [.. names], false)));
             }
@@ -583,10 +665,19 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
             {
                 ScheduleIdleStop(r);
             }
+
+            if (d.RealRoot is { } realRoot && _roots.TryGetValue(realRoot, out RootState? real) && real.Dirs.Remove(d))
+            {
+                ScheduleIdleStop(real);
+            }
         }
 
         // Wait for a delivery in progress so no callback runs after Dispose returns (skipped when called from a callback).
         WaitForDelivery(d);
+        if (d.RealRoot is { } other)
+        {
+            WaitForDelivery(other, null);
+        }
     }
 
     private void Unsubscribe(RootSubscription s)
@@ -778,6 +869,12 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
         public string Root { get; } = root;
 
         public string Dir { get; } = dir;
+
+        // Dir with its junctions and symlinks resolved, when it differs (set once, by ResolveRealDir).
+        public string? RealDir { get; set; }
+
+        // RealDir's drive root when it is another fixed drive, whose watcher then delivers to this subscription too.
+        public string? RealRoot { get; set; }
 
         public Action<DirChange> OnChange { get; } = onChange;
 

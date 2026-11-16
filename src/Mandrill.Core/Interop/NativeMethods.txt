@@ -173,3 +173,6 @@ GetObject
 BITMAP
 // Thumbnails for every type with a registered thumbnail handler (MicroDicom .dcm, video, Office)
 AssocQueryString
+// Live updates through junctions and symlinks: the watched folder's final path
+CreateFile
+GetFinalPathNameByHandle

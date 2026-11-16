@@ -623,6 +623,11 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         }
         else if (CurrentPath is { } path)
         {
+            if (_watch is not null)
+            {
+                Subscribe(path, renew: true); // F5 also re-resolves a junction's or symlink's real path for the watcher
+            }
+
             Reload(path);
         }
     }
@@ -1067,9 +1072,9 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void Subscribe(string path)
+    private void Subscribe(string path, bool renew = false)
     {
-        if (!_visible || (_watch is not null && PathUtil.PathEquals(_watchedPath, path)))
+        if (!_visible || (!renew && _watch is not null && PathUtil.PathEquals(_watchedPath, path)))
         {
             return;
         }
