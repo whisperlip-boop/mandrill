@@ -1,6 +1,7 @@
 {
   "app.title": "Mandrill",
   "menu.file": "ファイル",
+  "menu.file.newWindow": "新しいウィンドウ",
   "menu.file.settings": "設定…",
   "menu.file.language": "言語…",
   "menu.file.exit": "終了",
@@ -22,6 +23,7 @@
   "layout.4_grid": "4 ペイン (2 × 2)",
   "error.unexpected": "予期しないエラーが発生しました。ログを確認してください。",
   "error.noDataDirectory": "{path} に書き込めません。設定とログは保存されません。",
+  "error.newWindowFailed": "新しいウィンドウを開けませんでした。",
   "pane.newFolder": "新しいフォルダー",
   "pane.status.redirected": "{missing} は存在しなくなりました。{path} を表示しています。",
   "pane.status.driveRemoved": "ドライブ {drive} が取り外されました。PC を表示しています。",

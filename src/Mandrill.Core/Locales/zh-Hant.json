@@ -1,6 +1,7 @@
 {
   "app.title": "Mandrill",
   "menu.file": "檔案",
+  "menu.file.newWindow": "開新視窗",
   "menu.file.settings": "設定…",
   "menu.file.language": "語言…",
   "menu.file.exit": "結束",
@@ -22,6 +23,7 @@
   "layout.4_grid": "4 個窗格，2 × 2",
   "error.unexpected": "發生未預期的錯誤。請參閱記錄檔。",
   "error.noDataDirectory": "無法寫入 {path}。將不會儲存設定和記錄檔。",
+  "error.newWindowFailed": "無法開啟新視窗。",
   "pane.newFolder": "新增資料夾",
   "pane.status.redirected": "{missing} 已不存在。正在顯示 {path}。",
   "pane.status.driveRemoved": "磁碟機 {drive} 已移除。正在顯示本機。",

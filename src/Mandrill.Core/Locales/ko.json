@@ -1,6 +1,7 @@
 {
   "app.title": "Mandrill",
   "menu.file": "파일",
+  "menu.file.newWindow": "새 창",
   "menu.file.settings": "설정…",
   "menu.file.language": "언어…",
   "menu.file.exit": "끝내기",
@@ -22,6 +23,7 @@
   "layout.4_grid": "창 4개, 2 × 2",
   "error.unexpected": "예기치 않은 오류가 발생했습니다. 로그를 확인하세요.",
   "error.noDataDirectory": "{path}에 쓸 수 없습니다. 설정과 로그가 저장되지 않습니다.",
+  "error.newWindowFailed": "새 창을 열지 못했습니다.",
   "pane.newFolder": "새 폴더",
   "pane.status.redirected": "{missing}이(가) 더 이상 없습니다. {path}을(를) 표시합니다.",
   "pane.status.driveRemoved": "{drive} 드라이브가 제거되었습니다. 내 PC를 표시합니다.",

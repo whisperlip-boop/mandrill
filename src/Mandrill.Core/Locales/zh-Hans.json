@@ -1,6 +1,7 @@
 {
   "app.title": "Mandrill",
   "menu.file": "文件",
+  "menu.file.newWindow": "新建窗口",
   "menu.file.settings": "设置…",
   "menu.file.language": "语言…",
   "menu.file.exit": "退出",
@@ -22,6 +23,7 @@
   "layout.4_grid": "4 个窗格，2 × 2",
   "error.unexpected": "发生意外错误。请查看日志。",
   "error.noDataDirectory": "无法写入 {path}。设置和日志将不会保存。",
+  "error.newWindowFailed": "无法打开新窗口。",
   "pane.newFolder": "新建文件夹",
   "pane.status.redirected": "{missing} 已不存在。已改为显示 {path}。",
   "pane.status.driveRemoved": "驱动器 {drive} 已移除。已改为显示“此电脑”。",
