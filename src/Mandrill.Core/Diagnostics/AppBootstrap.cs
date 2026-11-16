@@ -142,9 +142,10 @@ public static class AppBootstrap
             ProbeLogFile(paths.LogFile);
             factory = MandrillLogging.Create(paths.LogFile, MandrillLogging.IsDebugEnabled, slot);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or WaitHandleCannotBeOpenedException)
         {
-            // Without a writable data directory the app still runs; there is just no log file.
+            // Without a writable data directory the app still runs; there is just no log file. (The log mutex name taken by
+            // another kind of kernel object is all but impossible with a hashed name; it must still not stop the app.)
             factory = NullLoggerFactory.Instance;
             fileLogging = false;
         }
@@ -170,6 +171,8 @@ public static class AppBootstrap
     }
 
     // Lowest free instance-<n>.lock in 1..8 (architecture §18 D1); counting processes would race when two start at once.
+    // The empty lock files stay in the data folder on purpose: DeleteOnClose would leave a delete-pending file that the
+    // next instance cannot open, so it would skip that number.
     private static (int Slot, FileStream? Lock) TakeInstanceSlot(string dataDirectory)
     {
         for (int n = 1; n <= 8; n++)
@@ -202,9 +205,9 @@ public static class AppBootstrap
             {
                 Thread.Sleep(100);
             }
-            catch (IOException ex) when (ex is not DirectoryNotFoundException)
+            catch (IOException ex) when ((ex.HResult & 0xFFFF) is 32 or 33)
             {
-                return;
+                return; // sharing or lock violation: a viewer holds the file; every other failure is real
             }
         }
     }

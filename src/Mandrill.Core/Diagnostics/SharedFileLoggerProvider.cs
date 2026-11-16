@@ -9,7 +9,7 @@ namespace Mandrill.Core.Diagnostics;
 /// Appends the log lines of every Mandrill process to one shared file (architecture §18 D1). <see cref="ILogger.Log"/> only
 /// enqueues; a background thread writes each batch under a named mutex, opening the file per batch, and rolls it at the limit.
 /// </summary>
-public sealed class SharedFileLoggerProvider : ILoggerProvider
+internal sealed class SharedFileLoggerProvider : ILoggerProvider
 {
     private const int MaxQueuedLines = 10_000;
     private const int MaxBatchChars = 256 * 1024;
@@ -68,6 +68,8 @@ public sealed class SharedFileLoggerProvider : ILoggerProvider
     }
 
     // One name per log file across processes; the hash keeps MANDRILL_DATA_DIR runs apart. Mutex names are case-sensitive.
+    // shortcut: only the case is normalized, so two spellings of one folder (8.3 name, subst, junction, UNC vs mapped drive)
+    // get two mutexes; reachable only through MANDRILL_DATA_DIR. Upgrade: hash the final path (GetFinalPathNameByHandle).
     internal static string MutexName(string path)
     {
         ulong hash = XxHash64.HashToUInt64(Encoding.UTF8.GetBytes(Path.GetFullPath(path).ToUpperInvariant()));
@@ -110,7 +112,7 @@ public sealed class SharedFileLoggerProvider : ILoggerProvider
         {
             while (true)
             {
-                bool stopping = Take(batch);
+                Take(batch);
                 if (batch.Length == 0)
                 {
                     return; // disposed and drained
@@ -123,16 +125,22 @@ public sealed class SharedFileLoggerProvider : ILoggerProvider
                     continue;
                 }
 
-                // Keep the batch and retry; a stopping provider gives up at the drain limit.
+                // Keep the batch and retry; a stopping provider gives up at the drain limit. Read after the attempt: a
+                // Dispose during a failing append must not get the full backoff.
+                bool stopping = _disposed;
                 long wait = stopping ? Math.Min(backoff, Volatile.Read(ref _drainDeadline) - Environment.TickCount64) : backoff;
                 if (wait <= 0)
                 {
                     return;
                 }
 
-                Thread.Sleep((int)wait);
+                Backoff(wait, stopping);
                 backoff = Math.Min(backoff * 2, MaxBackoffMs);
             }
+        }
+        catch (Exception)
+        {
+            // Logging must never end the app: an unexpected failure (not I/O or access) stops the writer; later lines are lost.
         }
         finally
         {
@@ -140,8 +148,21 @@ public sealed class SharedFileLoggerProvider : ILoggerProvider
         }
     }
 
-    // Moves queued lines into the batch (waits while there is nothing to write); returns true once disposed.
-    private bool Take(StringBuilder batch)
+    // Waits for the backoff. A Dispose cuts it short (the drain then retries at once); new lines do not.
+    private void Backoff(long ms, bool stopping)
+    {
+        long until = Environment.TickCount64 + ms;
+        lock (_queue)
+        {
+            while ((stopping || !_disposed) && until - Environment.TickCount64 is > 0 and var left)
+            {
+                Monitor.Wait(_queue, (int)left);
+            }
+        }
+    }
+
+    // Moves queued lines into the batch; waits while there is nothing to write and the provider is not disposed.
+    private void Take(StringBuilder batch)
     {
         lock (_queue)
         {
@@ -161,8 +182,6 @@ public sealed class SharedFileLoggerProvider : ILoggerProvider
             {
                 batch.Append(_queue.Dequeue());
             }
-
-            return _disposed;
         }
     }
 
