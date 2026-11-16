@@ -1,5 +1,6 @@
 using Mandrill.App.Platform;
 using Mandrill.Core.Diagnostics;
+using Mandrill.Core.Platform;
 using Mandrill.Core.State;
 using Mandrill.Presentation.Layout;
 using Mandrill.Presentation.Session;
@@ -24,6 +25,7 @@ public sealed class SessionCoordinator : IAsyncDisposable
     private readonly StartupState _state;
     private readonly SessionController _controller;
     private readonly ILogger _logger;
+    private readonly int _instanceSlot;
     private RectInt32? _normalBounds;
     private CloseState _close;
 
@@ -32,8 +34,10 @@ public sealed class SessionCoordinator : IAsyncDisposable
     /// <param name="layout">Layout manager (attached to the main view model by the caller).</param>
     /// <param name="state">Settings, session and stores loaded at startup.</param>
     /// <param name="loggerFactory">Logger factory.</param>
-    public SessionCoordinator(Window window, LayoutManager layout, StartupState state, ILoggerFactory loggerFactory)
+    /// <param name="instanceSlot">This process's instance number (<c>BootstrapResult.InstanceSlot</c>): the cascade offset.</param>
+    public SessionCoordinator(Window window, LayoutManager layout, StartupState state, ILoggerFactory loggerFactory, int instanceSlot = 1)
     {
+        _instanceSlot = instanceSlot;
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _state = state ?? throw new ArgumentNullException(nameof(state));
         ArgumentNullException.ThrowIfNull(loggerFactory);
@@ -46,7 +50,10 @@ public sealed class SessionCoordinator : IAsyncDisposable
     /// <summary>Background work to stop before the window closes, alongside the session save (bounds its own wait). Never awaited past a throw.</summary>
     public Func<Task>? StopBackgroundAsync { get; set; }
 
-    /// <summary>Moves and sizes the window to the saved normal bounds (before Activate); first run keeps the default placement.</summary>
+    /// <summary>
+    /// Moves and sizes the window to the saved normal bounds (before Activate), offset for a second or later instance
+    /// (§18 D5); first run keeps the default placement.
+    /// </summary>
     public void ApplySavedBounds()
     {
         if (_state.Session.Window is not { } saved)
@@ -57,7 +64,8 @@ public sealed class SessionCoordinator : IAsyncDisposable
         // Placement is cosmetic: a failure here must never stop the app (it did: "Startup failed", WP-1.14).
         try
         {
-            if (WindowPlacementRules.Fit(saved, DisplayWorkAreas()) is { } rect)
+            double scale = WindowOwner.Scale(WinRT.Interop.WindowNative.GetWindowHandle(_window));
+            if (WindowPlacementRules.Fit(WindowPlacementRules.Cascade(saved, _instanceSlot, scale), DisplayWorkAreas()) is { } rect)
             {
                 _window.AppWindow.MoveAndResize(rect);
                 _normalBounds = rect;

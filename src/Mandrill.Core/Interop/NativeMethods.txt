@@ -183,3 +183,5 @@ FILE_INFO_BY_HANDLE_CLASS
 FILE_ACCESS_RIGHTS
 FILE_RENAME_FLAG_POSIX_SEMANTICS
 FILE_RENAME_FLAG_REPLACE_IF_EXISTS
+// Window cascade for a second instance (§18 D5): the window's DPI before it is shown
+GetDpiForWindow

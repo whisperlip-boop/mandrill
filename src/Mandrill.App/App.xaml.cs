@@ -174,7 +174,7 @@ public sealed partial class App : Application
             };
             _window.ShowLayout(layout, views.Create);
             PerfLog.Mark("layout shown");
-            _session = new SessionCoordinator(_window, layout, boot.State, boot.LoggerFactory);
+            _session = new SessionCoordinator(_window, layout, boot.State, boot.LoggerFactory, boot.InstanceSlot);
             _session.ApplySavedBounds();
             _window.ExitHandler = _session.RequestCloseAsync;
             _session.StopBackgroundAsync = () => services.Index.StopAsync(CancellationToken.None); // saves what changed, ≤3 s

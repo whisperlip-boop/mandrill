@@ -43,6 +43,27 @@ public static class WindowPlacementRules
         return new RectInt32(primary.X + ((primary.Width - width) / 2), primary.Y + ((primary.Height - height) / 2), width, height);
     }
 
+    /// <summary>
+    /// The saved placement for instance <paramref name="instanceSlot"/> (architecture §18 D5): instance n &gt; 1 opens
+    /// (n-1) × 32 px (at 100 %) right of and below it, so windows started together do not cover each other exactly; a
+    /// maximized placement stays as it is. <see cref="Fit"/> then keeps the result on screen.
+    /// </summary>
+    /// <param name="saved">Saved normal bounds (physical pixels).</param>
+    /// <param name="instanceSlot">This process's instance number (0 = none, 1 = the first).</param>
+    /// <param name="scale">The window's DPI scale (1 at 100 %).</param>
+    /// <returns>The placement to fit.</returns>
+    public static WindowPlacement Cascade(WindowPlacement saved, int instanceSlot, double scale)
+    {
+        ArgumentNullException.ThrowIfNull(saved);
+        if (instanceSlot <= 1 || saved.Maximized)
+        {
+            return saved;
+        }
+
+        int offset = (int)Math.Round((instanceSlot - 1) * 32 * scale);
+        return saved with { X = saved.X + offset, Y = saved.Y + offset };
+    }
+
     /// <summary>A child window of <paramref name="size"/> centred over <paramref name="owner"/>, kept inside the owner's work area.</summary>
     /// <param name="owner">The owner window's bounds (physical pixels).</param>
     /// <param name="size">The child's size (physical pixels).</param>
