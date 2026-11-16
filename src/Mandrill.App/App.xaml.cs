@@ -44,6 +44,8 @@ public sealed partial class App : Application
     private DialogLauncher? _dialogs;
     private SearchWindows? _searchWindows;
     private StateFileWatcher? _stateWatcher;
+    private int _settingsReloads; // reload requests per file: only the latest one is applied (results can finish out of order)
+    private int _favoritesReloads;
     private PaneContextMenus? _contextMenus;
     private Action<IndexStatus>? _indexStatusHandler;
     private bool _windowClosed;
@@ -460,6 +462,10 @@ public sealed partial class App : Application
 
             watcher.Changed += file => _ = ReloadStateAsync(file, boot.State, settings, favorites, dispatcher);
             _stateWatcher = watcher;
+
+            // A save by another window between this window's start-up load and now raised nothing: catch up once.
+            _ = ReloadStateAsync(StateFileWatcher.SettingsFileName, boot.State, settings, favorites, dispatcher);
+            _ = ReloadStateAsync(StateFileWatcher.FavoritesFileName, boot.State, settings, favorites, dispatcher);
         }
         catch (Exception ex)
         {
@@ -475,26 +481,31 @@ public sealed partial class App : Application
         {
             if (file == StateFileWatcher.SettingsFileName)
             {
+                int request = Interlocked.Increment(ref _settingsReloads);
                 if (await state.SettingsStore.TryReloadAsync(CancellationToken.None) is { } next)
                 {
                     dispatcher.Post(() =>
                     {
-                        if (!_windowClosed)
+                        if (!_windowClosed && request == Volatile.Read(ref _settingsReloads))
                         {
                             settings.ApplyExternal(next);
                         }
                     });
                 }
             }
-            else if (await state.FavoritesStore.TryReloadAsync(CancellationToken.None) is { } document)
+            else
             {
-                dispatcher.Post(() =>
+                int request = Interlocked.Increment(ref _favoritesReloads);
+                if (await state.FavoritesStore.TryReloadAsync(CancellationToken.None) is { } document)
                 {
-                    if (!_windowClosed)
+                    dispatcher.Post(() =>
                     {
-                        favorites.ReplaceAll(document);
-                    }
-                });
+                        if (!_windowClosed && request == Volatile.Read(ref _favoritesReloads))
+                        {
+                            favorites.ReplaceAll(document);
+                        }
+                    });
+                }
             }
         }
         catch (Exception ex)

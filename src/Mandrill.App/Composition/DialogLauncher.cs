@@ -84,11 +84,11 @@ public sealed class DialogLauncher
                 return;
             }
 
-            if (!await _settings.SaveAsync(before with { Language = chosen.Code }, CancellationToken.None))
+            if (!await _settings.SaveLanguageAsync(chosen.Code, CancellationToken.None))
             {
                 // SaveAsync applied the new value before the write failed: put the old one back, so neither the next picker
                 // nor a later Settings save treats the unsaved language as saved (CR1). This write retries the unchanged file.
-                await _settings.SaveAsync(_settings.Current with { Language = before.Language }, CancellationToken.None);
+                await _settings.SaveLanguageAsync(before.Language, CancellationToken.None);
                 _showStatus(Localizer.Current["dialog.settings.error.save"]);
                 return;
             }
@@ -143,7 +143,7 @@ public sealed class DialogLauncher
             var index = new ExcludeListEditor(_settings.Current.Index, CheckFolderAsync);
             var dialog = new SettingsDialog(_settings.Current, _icons, index, PickFolderAsync) { XamlRoot = root, RequestedTheme = AppTheme.Of(root) };
             if (await dialog.ShowAsync() == ContentDialogResult.Primary
-                && !await _settings.SaveAsync(dialog.ToSettings(), CancellationToken.None))
+                && !await _settings.SaveAsync(dialog.ToSettings(_settings.Current), CancellationToken.None))
             {
                 _showStatus(Localizer.Current["dialog.settings.error.save"]);
             }

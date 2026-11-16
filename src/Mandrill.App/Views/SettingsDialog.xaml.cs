@@ -59,9 +59,13 @@ public sealed partial class SettingsDialog : ContentDialog
         AttachIndex();
     }
 
-    /// <summary>The settings as chosen in the dialog (unchanged parts, such as the index options, are kept).</summary>
+    /// <summary>
+    /// The settings as chosen in the dialog, on top of <paramref name="current"/>: a field the dialog does not show (the
+    /// language) keeps what another window may have saved meanwhile (architecture §18 D3); the shown ones are as chosen.
+    /// </summary>
+    /// <param name="current">The settings in effect when the user chose Save.</param>
     /// <returns>The new settings.</returns>
-    public AppSettings ToSettings() => _original with
+    public AppSettings ToSettings(AppSettings current) => (current ?? throw new ArgumentNullException(nameof(current))) with
     {
         Theme = Themes[Math.Clamp(ThemeChoice.SelectedIndex, 0, Themes.Length - 1)].Value,
         ShowFavoritesBar = FavoritesBarToggle.IsOn,

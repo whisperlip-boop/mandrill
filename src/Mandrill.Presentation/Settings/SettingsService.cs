@@ -45,6 +45,15 @@ public sealed class SettingsService
     }
 
     /// <summary>
+    /// Saves a language choice on top of <see cref="Current"/> at this moment, so settings another window saved while the
+    /// picker was open are kept (architecture §18 D3). See <see cref="SaveAsync"/>.
+    /// </summary>
+    /// <param name="language">"auto" or a language code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when written.</returns>
+    public Task<bool> SaveLanguageAsync(string language, CancellationToken ct) => SaveAsync(Current with { Language = language }, ct);
+
+    /// <summary>
     /// Applies <paramref name="next"/> at once and writes settings.json (temp file + replace). A failed write is logged and
     /// reported; the new values stay in effect for this session.
     /// </summary>

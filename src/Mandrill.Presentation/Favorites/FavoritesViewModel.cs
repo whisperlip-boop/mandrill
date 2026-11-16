@@ -209,6 +209,11 @@ public sealed partial class FavoritesViewModel : ObservableObject
     public void ReplaceAll(FavoritesDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
+        if (Items.Count == document.Favorites.Count && Items.Zip(document.Favorites).All(p => Same(p.First, p.Second)))
+        {
+            return; // e.g. the watcher-error path reloads an unchanged file: no flicker
+        }
+
         Items.Clear();
         foreach (Favorite favorite in document.Favorites)
         {
@@ -217,6 +222,10 @@ public sealed partial class FavoritesViewModel : ObservableObject
 
         _logger.LogInformation("Favorites changed by another instance: {Count}", Items.Count);
     }
+
+    // Value equality: the record's Panes list compares by reference.
+    private static bool Same(Favorite a, Favorite b)
+        => a.Name == b.Name && a.Layout == b.Layout && a.Splitters == b.Splitters && a.Panes.SequenceEqual(b.Panes);
 
     /// <summary>Deletes a favorite (AC-1.30; the view asked for confirmation).</summary>
     /// <param name="name">Name.</param>
