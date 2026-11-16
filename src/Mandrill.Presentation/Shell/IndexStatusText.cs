@@ -10,7 +10,7 @@ namespace Mandrill.Presentation.Shell;
 public sealed record IndexStatusText(string Text, string? Detail)
 {
     /// <summary>
-    /// Formats <paramref name="status"/>: a localized text per state (with the item count or the percentage) and, as detail,
+    /// Formats <paramref name="status"/> (empty text for <see cref="IndexState.Standby"/>): a localized text per state (with the item count or the percentage) and, as detail,
     /// the last update in local time plus <see cref="IndexStatus.Message"/>, which is unlocalized (drive root or error).
     /// </summary>
     /// <param name="status">The index status.</param>
@@ -20,6 +20,11 @@ public sealed record IndexStatusText(string Text, string? Detail)
     public static IndexStatusText From(IndexStatus status, Localizer? localizer = null, TimeZoneInfo? zone = null)
     {
         ArgumentNullException.ThrowIfNull(status);
+        if (status.State == IndexState.Standby)
+        {
+            return new IndexStatusText(string.Empty, null); // another instance owns the index: no indicator (§18 D2)
+        }
+
         Localizer l = localizer ?? Localizer.Current;
         // Passed as "count" to Plural: it overrides Plural's raw count with the grouped form (Format keeps the last value
         // given for a name).

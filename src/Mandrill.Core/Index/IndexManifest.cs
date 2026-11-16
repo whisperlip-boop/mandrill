@@ -58,7 +58,7 @@ public sealed record IndexManifest(IReadOnlyDictionary<string, DriveIndexInfo> D
                 return Empty();
             }
 
-            ReadOnlySpan<byte> json = File.ReadAllBytes(PathUtil.ToIo(path));
+            ReadOnlySpan<byte> json = ReadShared(PathUtil.ToIo(path));
             json = json.StartsWith(Encoding.UTF8.Preamble) ? json[Encoding.UTF8.Preamble.Length..] : json; // a hand-edited copy may carry a BOM
             if (JsonNode.Parse(json) is not JsonObject node
                 || node["version"]?.GetValue<int>() != CurrentVersion)
@@ -108,13 +108,22 @@ public sealed record IndexManifest(IReadOnlyDictionary<string, DriveIndexInfo> D
                 stream.Flush(flushToDisk: true);
             }
 
-            File.Move(temp, target, overwrite: true);
+            IndexFile.ReplaceFile(temp, target);
         }
         catch
         {
             TryDeleteTemp(temp); // never leave a half-written .tmp behind
             throw;
         }
+    }
+
+    // Delete sharing: the owner instance can replace the manifest while a reader reads it (§18 D2, IndexFile.ReplaceFile).
+    private static byte[] ReadShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        byte[] bytes = new byte[stream.Length];
+        stream.ReadExactly(bytes);
+        return bytes;
     }
 
     private static void TryDeleteTemp(string temp)

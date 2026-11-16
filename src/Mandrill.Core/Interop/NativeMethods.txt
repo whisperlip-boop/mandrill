@@ -176,3 +176,7 @@ AssocQueryString
 // Live updates through junctions and symlinks: the watched folder's final path
 CreateFile
 GetFinalPathNameByHandle
+// Multiple instances (§18 D2): replace an index file that a reader holds open with FileShare.Delete
+SetFileInformationByHandle
+FILE_RENAME_INFO
+FILE_INFO_BY_HANDLE_CLASS

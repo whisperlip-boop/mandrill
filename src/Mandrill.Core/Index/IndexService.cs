@@ -84,6 +84,9 @@ public sealed class IndexServiceOptions
     /// the build allocates, risk R6), restored afterwards.
     /// </summary>
     public bool LowLatencyGcWhileBuilding { get; init; }
+
+    /// <summary>How often a reader instance tries to become the index owner (architecture §18 D2: 60 s).</summary>
+    public TimeSpan OwnerRetryInterval { get; init; } = TimeSpan.FromSeconds(60);
 }
 
 /// <summary>
@@ -94,12 +97,16 @@ public sealed class IndexServiceOptions
 /// drive arrival and removal, apply deletes reported by search, and (WP-2.4) apply watcher changes every 2 s, verify a
 /// drive whose watcher overflowed (at most every 10 min), compact segments that drifted, and follow settings changes.
 /// A write failure keeps the index in memory (E-2.14).
+/// With several Mandrill instances (§18 D2) only the one holding <c>index\owner.lock</c> builds, verifies and writes; the
+/// others are readers that load the saved index on their first search and retry the lock every minute.
 /// An unhandled failure restarts the thread once after a minute; a second one leaves the state at Error while the
 /// segments stay searchable.
 /// </summary>
 public sealed class IndexService : IIndexService
 {
     private const long StatusThrottleMs = 250;
+    private const string OwnerLockFile = "owner.lock";
+    private const int SharingViolation = unchecked((int)0x80070020);
 
     private readonly IndexServiceOptions _options;
     private readonly ILogger _logger;
@@ -122,6 +129,7 @@ public sealed class IndexService : IIndexService
     private readonly HashSet<string> _overflowPending = new(PathUtil.Comparer);
     private readonly Dictionary<string, DateTime> _lastOverflowVerify = new(PathUtil.Comparer);
     private readonly Dictionary<string, string[]> _segmentExclude = new(PathUtil.Comparer); // what each segment was built with
+    private readonly Dictionary<string, (DateTime, long)?> _loadedStamps = new(PathUtil.Comparer); // the file each segment was loaded from
     private Dictionary<string, DriveIndexInfo> _manifest = new(StringComparer.OrdinalIgnoreCase);
     private bool _loading;
     private bool _saveFailed;
@@ -134,6 +142,11 @@ public sealed class IndexService : IIndexService
     private DateTime _lastApplyUtc;
     private string? _holdRoot; // a building drive whose changes wait for the build (its base is still being written)
     private HashSet<string>? _replay; // paths applied during a verify, replayed onto the new segment
+    private FileStream? _ownerLock; // index\owner.lock, held while this instance owns the index
+    private bool _roleChosen;
+    private bool _reader; // another instance owns the index: never build, verify, save or delete in index\
+    private bool _standby; // a reader that has not loaded the index (it loads on the first search)
+    private bool _loadWanted;
 
     // Shared state.
     private DriveSegment[] _segments = [];
@@ -156,6 +169,8 @@ public sealed class IndexService : IIndexService
     private ITimer? _saveTimer;
     private ITimer? _restartTimer;
     private ITimer? _applyTimer;
+    private ITimer? _ownerTimer;
+    private TaskCompletionSource? _loaded;
 
     /// <summary>Creates the service; nothing runs until <see cref="Start"/>.</summary>
     /// <param name="options">Options.</param>
@@ -210,6 +225,28 @@ public sealed class IndexService : IIndexService
 
     /// <inheritdoc/>
     public void ApplySettings() => Enqueue(new SettingsCommand());
+
+    /// <inheritdoc/>
+    public Task EnsureLoadedAsync()
+    {
+        lock (_gate)
+        {
+            if (_loaded is null)
+            {
+                _loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (_stopping)
+                {
+                    _loaded.TrySetResult();
+                }
+                else
+                {
+                    Enqueue(new EnsureLoadedCommand());
+                }
+            }
+
+            return _loaded.Task;
+        }
+    }
 
     /// <inheritdoc/>
     public void Start()
@@ -315,6 +352,8 @@ public sealed class IndexService : IIndexService
             _saveTimer?.Dispose();
             _restartTimer?.Dispose();
             _applyTimer?.Dispose();
+            _ownerTimer?.Dispose();
+            _loaded?.TrySetResult(); // nothing loads any more
         }
 
         CancelBuild();
@@ -331,6 +370,7 @@ public sealed class IndexService : IIndexService
         if (!threadRunning)
         {
             CloseWatches(); // no index thread runs (failed, waiting for its restart), so this thread may touch them
+            ReleaseOwnerLock();
             _stopped.TrySetResult(); // nothing runs that could save
         }
 
@@ -397,6 +437,7 @@ public sealed class IndexService : IIndexService
                 {
                     CloseWatches();
                     SaveDirty();
+                    ReleaseOwnerLock(); // after the last save: a reader that takes over finds it on disk
                     _queue.CompleteAdding();
                     ReleaseHandles();
                     break;
@@ -436,6 +477,7 @@ public sealed class IndexService : IIndexService
         PublishStatus(force: true);
         if (!restart)
         {
+            CompleteLoaded(); // no thread runs a queued load any more
             _stopped.TrySetResult(); // stays in Error; the segments stay searchable
         }
     }
@@ -463,13 +505,26 @@ public sealed class IndexService : IIndexService
         switch (command)
         {
             case LoadCommand:
-                LoadAll();
+                ChooseRole();
+                if (!_standby)
+                {
+                    LoadAll();
+                }
+
+                SatisfyLoad();
+                break;
+            case EnsureLoadedCommand:
+                _loadWanted = true;
+                SatisfyLoad();
+                break;
+            case OwnerRetryCommand:
+                TryTakeOwnership();
                 break;
             case BuildCommand build:
                 _pendingBuilds.Remove(build.Root);
                 BuildDrive(build.Root, build.Verify);
                 break;
-            case VerifyCommand:
+            case VerifyCommand when !_reader:
                 VerifyAll();
                 break;
             case RestartCommand restart:
@@ -513,7 +568,11 @@ public sealed class IndexService : IIndexService
         try
         {
             PublishStatus(force: true);
-            RemoveStaleTempFiles();
+            if (!_reader)
+            {
+                RemoveStaleTempFiles(); // a reader never deletes in index\ (they may be the owner's temps)
+            }
+
             _manifest = new Dictionary<string, DriveIndexInfo>(IndexManifest.Read(_options.IndexDirectory, _logger).Drives, StringComparer.OrdinalIgnoreCase);
             _lastUpdatedUtc = _manifest.Values.Select(LastPass).Max();
             _appliedExclude = ExcludeList();
@@ -532,7 +591,7 @@ public sealed class IndexService : IIndexService
     // A saved index loads at once (searchable before any rescan, AC-2.6); anything unusable is discarded and rebuilt.
     private void LoadOrQueue(string root)
     {
-        if (Find(root) is not null)
+        if (_standby || Find(root) is not null)
         {
             return;
         }
@@ -552,6 +611,7 @@ public sealed class IndexService : IIndexService
             if (info.VolumeSerial == serial)
             {
                 long loadStart = Stopwatch.GetTimestamp();
+                (DateTime, long)? stamp = Stamp(file); // before the load: a save that lands meanwhile counts as newer
                 IndexLoadResult loaded = IndexFile.Load(file, serial);
                 if (loaded.Segment is { } segment && PathUtil.PathEquals(segment.Root, root))
                 {
@@ -563,6 +623,7 @@ public sealed class IndexService : IIndexService
                         segment.ByteSize / 1048576.0,
                         Environment.WorkingSet >> 20);
                     Publish(segment);
+                    _loadedStamps[root] = stamp;
                     _segmentExclude[root] = Mine(_appliedExclude, root); // saved with the list of that time; a settings change re-diffs
                     _logger.LogInformation("Index {Root} loaded: {Items} items, complete {Complete}", root, segment.Count, segment.IsComplete);
                     if (!segment.IsComplete)
@@ -578,6 +639,11 @@ public sealed class IndexService : IIndexService
             else
             {
                 _logger.LogInformation("Index {Root}: volume serial changed; rebuilding", root);
+            }
+
+            if (_reader)
+            {
+                return; // the owner instance discards and rebuilds it
             }
 
             TryDelete(file);
@@ -613,7 +679,7 @@ public sealed class IndexService : IIndexService
 
     private void QueueBuild(string root, bool verify)
     {
-        if (_pendingBuilds.Add(root))
+        if (!_reader && _pendingBuilds.Add(root))
         {
             Enqueue(new BuildCommand(root, verify));
         }
@@ -1143,6 +1209,11 @@ public sealed class IndexService : IIndexService
     // Drive file first, manifest last (§8.3). A failure keeps everything in memory and is retried at the next save.
     private void SaveSegment(DriveSegment segment)
     {
+        if (_reader)
+        {
+            return; // the owner writes; a reader's in-memory changes are written if it takes over
+        }
+
         string letter = LetterOf(segment.Root);
         string fileName = IndexFile.FileNameFor(segment.Root, segment.VolumeSerial);
         try
@@ -1169,6 +1240,187 @@ public sealed class IndexService : IIndexService
                 _logger.LogWarning(ex, "Writing the index failed; it stays in memory and the write is retried");
                 PublishStatus(force: true);
             }
+        }
+    }
+
+    // §18 D2: the first instance to open index\owner.lock owns the index; a sharing violation makes this one a reader.
+    private void ChooseRole()
+    {
+        if (_roleChosen)
+        {
+            return;
+        }
+
+        _roleChosen = true;
+        if (TryOpenOwnerLock() != false)
+        {
+            _logger.LogInformation("Index owner (pid {Pid})", Environment.ProcessId);
+            return;
+        }
+
+        _reader = true;
+        _standby = true;
+        _logger.LogInformation("Index reader (pid {Pid}): another instance owns the index; it loads on the first search", Environment.ProcessId);
+        lock (_gate)
+        {
+            if (!_stopping)
+            {
+                _ownerTimer = _options.Time.CreateTimer(_ => Enqueue(new OwnerRetryCommand()), null, _options.OwnerRetryInterval, _options.OwnerRetryInterval);
+            }
+        }
+    }
+
+    // True: held. False: another instance holds it. Null: unavailable (folder not writable): an owner as before, never a takeover.
+    private bool? TryOpenOwnerLock()
+    {
+        try
+        {
+            string directory = PathUtil.ToIo(_options.IndexDirectory);
+            Directory.CreateDirectory(directory);
+            _ownerLock = new FileStream(Path.Combine(directory, OwnerLockFile), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            return true;
+        }
+        catch (IOException ex) when (ex.HResult == SharingViolation)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Index: the owner lock is unavailable");
+            return null;
+        }
+    }
+
+    private void ReleaseOwnerLock()
+    {
+        _ownerLock?.Dispose();
+        _ownerLock = null;
+    }
+
+    // EnsureLoadedAsync: a Standby reader loads now (read-only); the waiting task completes after this in every case.
+    private void SatisfyLoad()
+    {
+        if (!_roleChosen || !_loadWanted)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_standby)
+            {
+                _standby = false;
+                _logger.LogInformation("Index reader: loading the saved index for search");
+                LoadAll();
+            }
+        }
+        finally
+        {
+            CompleteLoaded();
+        }
+    }
+
+    private void CompleteLoaded()
+    {
+        lock (_gate)
+        {
+            _loaded?.TrySetResult();
+        }
+    }
+
+    // A reader retries the lock every OwnerRetryInterval; on success it goes on the way an owner starts.
+    private void TryTakeOwnership()
+    {
+        if (!_reader || TryOpenOwnerLock() != true)
+        {
+            return;
+        }
+
+        _reader = false;
+        _logger.LogInformation("Index ownership taken (pid {Pid})", Environment.ProcessId);
+        int hours = SafeSettings().RescanHours;
+        lock (_gate)
+        {
+            _ownerTimer?.Dispose();
+            _ownerTimer = null;
+            if (!_stopping)
+            {
+                _verifyTimer?.Change(_options.VerifyDelay, hours > 0 ? TimeSpan.FromHours(hours) : Timeout.InfiniteTimeSpan);
+            }
+        }
+
+        if (_standby)
+        {
+            _standby = false;
+            LoadAll();
+            CompleteLoaded();
+        }
+        else
+        {
+            ReloadChanged();
+        }
+    }
+
+    // A loaded reader that took over: drives the old owner saved since this instance loaded them are reloaded (the loaded
+    // segment serves search until then); the others keep this instance's applied changes (dirty, so the next save writes
+    // them). Missing and incomplete drives are then loaded or built as at an owner's start.
+    private void ReloadChanged()
+    {
+        _manifest = new Dictionary<string, DriveIndexInfo>(IndexManifest.Read(_options.IndexDirectory, _logger).Drives, StringComparer.OrdinalIgnoreCase);
+        foreach (DriveSegment segment in Segments.ToList())
+        {
+            if (!_manifest.TryGetValue(LetterOf(segment.Root), out DriveIndexInfo? info) || info.VolumeSerial != segment.VolumeSerial)
+            {
+                _dirty.Add(segment.Root); // not on disk as loaded: this copy is written at the next save
+                continue;
+            }
+
+            string file = Path.Combine(_options.IndexDirectory, info.File);
+            (DateTime, long)? stamp = Stamp(file);
+            if (stamp is null || stamp == _loadedStamps.GetValueOrDefault(segment.Root))
+            {
+                continue;
+            }
+
+            IndexLoadResult loaded = IndexFile.Load(file, segment.VolumeSerial);
+            if (loaded.Segment is { } fresh && PathUtil.PathEquals(fresh.Root, segment.Root))
+            {
+                Replace(segment, fresh);
+                _loadedStamps[segment.Root] = stamp;
+                _segmentExclude[segment.Root] = Mine(_appliedExclude, segment.Root);
+                _dirty.Remove(segment.Root);
+                _logger.LogInformation("Index {Root} reloaded after the previous owner's save: {Items} items", segment.Root, fresh.Count);
+            }
+            else
+            {
+                _logger.LogWarning("Index file {File} not reloaded ({Reason}); keeping the loaded copy", info.File, loaded.Failure);
+                _dirty.Add(segment.Root);
+            }
+        }
+
+        foreach (DriveDescriptor drive in _options.Drives.Current.Where(Indexed))
+        {
+            LoadOrQueue(drive.Root);
+        }
+
+        foreach (DriveSegment segment in Segments.Where(s => !s.IsComplete))
+        {
+            QueueBuild(segment.Root, verify: false);
+        }
+    }
+
+    // A save replaces the drive file, so its write time and length tell whether it changed since it was loaded.
+    private (DateTime, long)? Stamp(string file)
+    {
+        try
+        {
+            var info = new FileInfo(PathUtil.ToIo(file));
+            return info.Exists ? (info.LastWriteTimeUtc, info.Length) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogDebug(ex, "Index: {File} not readable", file);
+            return null;
         }
     }
 
@@ -1284,6 +1536,7 @@ public sealed class IndexService : IIndexService
     private void PublishStatus(bool force)
     {
         IndexState state = _failed ? IndexState.Error
+            : _standby ? IndexState.Standby
             : _buildRoot is not null ? (PauseHeld() ? IndexState.Paused : IndexState.Scanning)
             : _loading ? IndexState.Loading
             : _pendingBuilds.Count > 0 ? IndexState.Scanning
@@ -1336,6 +1589,10 @@ public sealed class IndexService : IIndexService
     private abstract record Command;
 
     private sealed record LoadCommand : Command;
+
+    private sealed record EnsureLoadedCommand : Command;
+
+    private sealed record OwnerRetryCommand : Command;
 
     private sealed record BuildCommand(string Root, bool Verify) : Command;
 

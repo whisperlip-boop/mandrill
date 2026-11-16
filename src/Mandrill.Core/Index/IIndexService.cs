@@ -17,6 +17,9 @@ public enum IndexState
 
     /// <summary>The index thread failed; the loaded segments stay searchable.</summary>
     Error,
+
+    /// <summary>Another instance owns the index; this one loads it on its first search (architecture §18 D2).</summary>
+    Standby,
 }
 
 /// <summary>A snapshot of the index state.</summary>
@@ -52,6 +55,13 @@ public interface IIndexService : ISearchIndex, IDisposable
     /// and a new RescanHours re-arms the verify timer. Applied on the index thread.
     /// </summary>
     void ApplySettings();
+
+    /// <summary>
+    /// Completes when the index is usable for search: a Standby reader loads the saved index once (later calls do not
+    /// reload); otherwise at once, or after the start-up load. Any thread; never faults.
+    /// </summary>
+    /// <returns>The same task for every call.</returns>
+    Task EnsureLoadedAsync();
 
     /// <summary>Starts the index thread (idempotent).</summary>
     void Start();

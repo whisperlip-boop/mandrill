@@ -122,13 +122,16 @@ public sealed partial class MainWindow : Window
     /// <param name="text">Localized text.</param>
     public void ShowStatus(string text) => StatusText.Text = text;
 
-    /// <summary>Shows the index indicator at the right of the status bar (AC-2.9); text only, it never takes focus. UI thread.</summary>
+    /// <summary>
+    /// Shows the index indicator at the right of the status bar (AC-2.9), hidden for an empty text; text only, it never
+    /// takes focus. UI thread.
+    /// </summary>
     /// <param name="status">Localized text and tooltip.</param>
     public void ShowIndexStatus(IndexStatusText status)
     {
         ArgumentNullException.ThrowIfNull(status);
         IndexText.Text = status.Text;
-        IndexText.Visibility = Visibility.Visible;
+        IndexText.Visibility = status.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible; // Standby: none
         ToolTipService.SetToolTip(IndexText, status.Detail);
     }
 

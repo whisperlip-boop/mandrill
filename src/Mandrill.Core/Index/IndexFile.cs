@@ -3,6 +3,9 @@ using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Mandrill.Core.IO;
+using Microsoft.Win32.SafeHandles;
+using Windows.Win32;
+using Windows.Win32.Storage.FileSystem;
 
 namespace Mandrill.Core.Index;
 
@@ -79,13 +82,52 @@ public static class IndexFile
         try
         {
             WriteFile(segment, tempIo, count, overlay);
-            File.Move(tempIo, pathIo, overwrite: true);
+            ReplaceFile(tempIo, pathIo);
         }
         catch
         {
             TryDelete(tempIo); // never leave a half-written .tmp behind
             throw;
         }
+    }
+
+    /// <summary>
+    /// Moves <paramref name="sourceIo"/> over <paramref name="targetIo"/>. A POSIX-semantics rename (NTFS, Windows 10 1809+)
+    /// also replaces a target that a reader holds open with delete sharing, which a plain move cannot (§18 D2); where it is
+    /// unsupported or fails, <see cref="File.Move(string, string, bool)"/> runs and reports the error as before.
+    /// </summary>
+    internal static unsafe void ReplaceFile(string sourceIo, string targetIo)
+    {
+        const uint DeleteAccess = 0x0001_0000; // DELETE: the right a rename needs
+        const uint ReplaceIfExistsPosix = 0x1 | 0x2; // FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS
+        using (SafeFileHandle handle = PInvoke.CreateFile(
+            sourceIo,
+            DeleteAccess,
+            FILE_SHARE_MODE.FILE_SHARE_READ | FILE_SHARE_MODE.FILE_SHARE_DELETE,
+            null,
+            FILE_CREATION_DISPOSITION.OPEN_EXISTING,
+            0,
+            null))
+        {
+            if (!handle.IsInvalid)
+            {
+                byte[] buffer = new byte[sizeof(FILE_RENAME_INFO) + (targetIo.Length * sizeof(char))]; // zeroed: the name ends in a null char
+                fixed (byte* p = buffer)
+                {
+                    var info = (FILE_RENAME_INFO*)p;
+                    info->Anonymous.Flags = ReplaceIfExistsPosix;
+                    info->FileNameLength = (uint)(targetIo.Length * sizeof(char));
+                    targetIo.CopyTo(info->FileName.AsSpan(targetIo.Length));
+                }
+
+                if (PInvoke.SetFileInformationByHandle(handle, FILE_INFO_BY_HANDLE_CLASS.FileRenameInfoEx, buffer))
+                {
+                    return;
+                }
+            }
+        }
+
+        File.Move(sourceIo, targetIo, overwrite: true);
     }
 
     private static void WriteFile(DriveSegment segment, string tempIo, int count, IReadOnlyList<OverlayItem> overlay)
@@ -161,7 +203,8 @@ public static class IndexFile
         ArgumentException.ThrowIfNullOrEmpty(path);
         try
         {
-            using var stream = new FileStream(PathUtil.ToIo(path), FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16);
+            // Delete sharing: the owner instance can replace the file while a reader loads it (§18 D2, ReplaceFile).
+            using var stream = new FileStream(PathUtil.ToIo(path), FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, 1 << 16);
             var reader = new HashingReader(stream);
             Span<byte> header = stackalloc byte[24];
             reader.Read(header);

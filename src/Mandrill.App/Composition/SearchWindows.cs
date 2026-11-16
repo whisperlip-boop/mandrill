@@ -67,6 +67,7 @@ public sealed class SearchWindows : IDisposable
         }
 
         long start = Stopwatch.GetTimestamp();
+        Task indexLoaded = _services.Index.EnsureLoadedAsync(); // a reader loads the index now (§18 D2); not awaited
         SearchViewModel? vm = null;
         SearchView? view = null;
         SearchWindow? window = null;
@@ -107,6 +108,7 @@ public sealed class SearchWindows : IDisposable
             menus.Attach(view, vm);
             _open[pane] = new Popup(created, vm);
             created.Activate();
+            _ = vm.RefreshWhenLoadedAsync(indexLoaded);
             var (openVm, openView, openTitle, openMenus) = (vm, view, titleHandler, menus);
             created.Closed += (_, _) =>
             {

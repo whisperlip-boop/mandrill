@@ -216,6 +216,31 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     /// <returns>A task that completes when the search ended.</returns>
     public Task RefreshAsync() => Scope is { } scope && SearchedText is { } text ? RunAsync(scope, text) : Task.CompletedTask;
 
+    /// <summary>
+    /// A reader instance loads the index on its first search (architecture §18 D2): when <paramref name="indexLoaded"/>
+    /// completes later, the search that ran meanwhile (on the empty or partial index) runs once more. Nothing when it has
+    /// completed already, no search ran, or the popup closed.
+    /// </summary>
+    /// <param name="indexLoaded">The index's <c>EnsureLoadedAsync</c> task.</param>
+    /// <returns>A task that completes after the repeated search started.</returns>
+    public async Task RefreshWhenLoadedAsync(Task indexLoaded)
+    {
+        ArgumentNullException.ThrowIfNull(indexLoaded);
+        if (indexLoaded.IsCompleted)
+        {
+            return;
+        }
+
+        await indexLoaded.ConfigureAwait(false);
+        RunOnUi(() =>
+        {
+            if (!_disposed)
+            {
+                Forget(RefreshAsync(), "Repeating the search after the index loaded");
+            }
+        });
+    }
+
     /// <summary>Esc: stops a running search; false when nothing ran (the view closes the popup).</summary>
     /// <returns>True when a search was stopped.</returns>
     public bool HandleEscape()
