@@ -237,6 +237,7 @@
             <TextBlock
                 x:Name="MessageText"
                 HorizontalAlignment="Center"
+                IsHitTestVisible="False"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 TextAlignment="Center"
                 TextWrapping="Wrap" />

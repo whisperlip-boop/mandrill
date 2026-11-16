@@ -247,7 +247,9 @@ public sealed partial class FileListView : UserControl
             return false;
         }
 
-        if (!HasFocusWithin)
+        // The list, not this control: the rename editor is in this control too, and a click away from it must move the focus
+        // so its LostFocus commits the rename (CR pre-release M1).
+        if (XamlRoot is null || !IsWithin(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject, list))
         {
             TakeFocus(list, FocusState.Pointer);
         }
@@ -1335,9 +1337,9 @@ public sealed partial class FileListView : UserControl
 
     private void OnBandPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (_list?.ItemsPanelRoot is not ItemsWrapGrid panel || _adapter is null)
+        if (_list?.ItemsPanelRoot is not ItemsWrapGrid panel || _adapter is null || IsRenaming)
         {
-            return;
+            return; // with the editor open the press only ends the rename (its commit runs on the focus change)
         }
 
         var point = e.GetCurrentPoint(panel);

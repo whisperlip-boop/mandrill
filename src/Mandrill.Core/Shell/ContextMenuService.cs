@@ -43,7 +43,8 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
 
     // The background menu's New folder items: the New submenu's Folder, and Windows 11's top-level item (an Explorer command
     // added at WM_INITMENUPOPUP; outside Explorer it creates "New folder" in the PARENT of the shown folder).
-    // shortcut: that GUID was read from the menu on Windows 10.0.26300; if a build changes it, that item is a no-op again.
+    // shortcut: that GUID was read from the menu on Windows 10.0.26300; if a build changes it, that item still creates the
+    // folder in the parent, as in 1.0.1. Upgrade: match the item by its command's canonical name on more builds.
     private static readonly string[] NewFolderVerbs = ["NewFolder", "{0001DEAD-9BF7-4CFA-8A5C-DE8679340002}"];
 
     // An open menu, or a verb's own modal UI (WP-3.1 spike: Shift+"delete" blocks InvokeCommand until its confirmation
@@ -813,6 +814,8 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     /// </summary>
     /// <param name="menu">The top-level menu.</param>
     /// <param name="own">Plain texts of Mandrill's own items.</param>
+    // shortcut: matched by text, so it works only when Mandrill's UI language equals the Windows display language; otherwise
+    // both "Open in Terminal" items show. Upgrade: identify the shell's item by its verb instead.
     internal static unsafe void RemoveShellDuplicates(HMENU menu, IReadOnlySet<string> own)
     {
         if (own.Count == 0)

@@ -209,15 +209,23 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
             return;
         }
 
-        AttachToRoot(realRoot, r =>
+        try
         {
-            if (!d.Disposed)
+            AttachToRoot(realRoot, r =>
             {
-                d.RealDir = real;
-                d.RealRoot = realRoot;
-                r.Dirs.Add(d);
-            }
-        });
+                if (!d.Disposed)
+                {
+                    d.RealDir = real;
+                    d.RealRoot = realRoot;
+                    r.Dirs.Add(d);
+                }
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // The feed was disposed while the path resolved (window closing): nothing to watch any more. A throw here would
+            // be unhandled on this pool work item and end the process.
+        }
     }
 
     // The folder's path with every junction and symlink on it resolved, or null (gone, denied, or a target without a drive
@@ -272,6 +280,12 @@ public sealed class ChangeFeed : IChangeFeed, IDisposable
             }
 
             add(r);
+            if (!r.HasSubscribers)
+            {
+                ScheduleIdleStop(r); // add declined (the subscription went away meanwhile): an unused root goes idle as usual
+                return;
+            }
+
             r.IdleTimer?.Dispose();
             r.IdleTimer = null;
             start = r.Lease is null && !r.Starting && r.RestartTimer is null;
