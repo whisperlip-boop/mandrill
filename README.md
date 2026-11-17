@@ -8,6 +8,8 @@ favorite, and find files by name across your local drives from Mandrill's own in
 - **Up to four panes** in eight layouts. Each pane has its own folder tree, file list, toolbar, path box with history,
   and back/forward/up. Add or remove a pane with one click.
 - **Tabs in every pane**: up to 10 per pane, each with its own folder, view, sort and colour.
+- **Several windows**: open another Mandrill window with **File → New window** (Ctrl+N). Settings and favorites stay in
+  sync between windows.
 - **Views**: Icons (several sizes), List and Details with sortable columns. Hidden files on request.
 - **Favorites**: save the current layout and every pane's folder as a named favorite and restore it with one click.
   Mandrill also reopens as you left it.
@@ -60,7 +62,7 @@ is not required. The installer needs [Inno Setup 6](https://jrsoftware.org/isinf
 dotnet build Mandrill.sln -c Release
 dotnet format Mandrill.sln --verify-no-changes
 dotnet publish src/Mandrill.App -c Release -r win-x64 --self-contained -o publish/
-& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.1 installer\Mandrill.iss
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.2 installer\Mandrill.iss
 ```
 
 `publish\Mandrill.exe` runs without installing. The installer is written to `dist\`. If Inno Setup is installed for

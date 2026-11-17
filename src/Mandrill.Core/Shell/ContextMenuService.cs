@@ -812,9 +812,10 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     }
 
     /// <summary>
-    /// QA N3 (lead): removes the shell's items whose text is one of Mandrill's own (<paramref name="own"/>, plain texts), so
-    /// each command is in the menu once and ours, the known path, stays. Runs when the menu opens, after the shell added its
-    /// lazy Explorer-command items (Windows 11's "Open in Terminal" arrives at WM_INITMENUPOPUP, not at QueryContextMenu).
+    /// QA N3 (lead): removes the shell's items by text (one of Mandrill's own, <paramref name="own"/>, plain texts) or, for
+    /// Open in Terminal, by verb (Windows Terminal's, in any language), so each command is in the menu once and ours, the
+    /// known path, stays. Runs when the menu opens, after the shell added its lazy Explorer-command items (Windows 11's
+    /// "Open in Terminal" arrives at WM_INITMENUPOPUP, not at QueryContextMenu).
     /// </summary>
     /// <param name="menu">The top-level menu.</param>
     /// <param name="own">Plain texts of Mandrill's own items.</param>
