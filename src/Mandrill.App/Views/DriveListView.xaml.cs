@@ -48,7 +48,7 @@ public sealed partial class DriveListView : UserControl
         List.ContainerContentChanging += (_, args) => Fill(args.ItemContainer, (DriveItem)args.Item);
         List.SelectionChanged += (_, _) => _selectedRoot = (List.SelectedItem as DriveItem)?.Root ?? _selectedRoot;
         List.DoubleTapped += (_, e) => e.Handled = Open(RowAt(e.OriginalSource as DependencyObject) is { } row ? List.ItemFromContainer(row) as DriveItem : null);
-        List.KeyDown += OnKeyDown;
+        List.AddHandler(KeyDownEvent, new KeyEventHandler(OnKeyDown), handledEventsToo: true); // ListViewBase marks Enter handled itself
         List.ContextRequested += OnContextRequested;
         Header.RenderTransform = _headerShift;
         HeaderClip.SizeChanged += (_, e) =>

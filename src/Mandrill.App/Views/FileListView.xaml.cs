@@ -447,7 +447,8 @@ public sealed partial class FileListView : UserControl
         list.DoubleTapped += OnDoubleTapped;
         AttachDragDrop(list);
         list.ContextRequested += OnListContextRequested;
-        list.KeyDown += OnListKeyDown;
+        // ListViewBase marks Enter handled itself (every selection mode), so a plain KeyDown subscriber never saw it (owner).
+        list.AddHandler(KeyDownEvent, new KeyEventHandler(OnListKeyDown), handledEventsToo: true);
         // Any key (arrows and Space are handled by the control itself) or focus leaving the list ends a pending slow click.
         list.AddHandler(KeyDownEvent, new KeyEventHandler((_, _) => CancelSlowClick()), handledEventsToo: true);
         list.LostFocus += (_, _) =>
@@ -1237,7 +1238,6 @@ public sealed partial class FileListView : UserControl
 
     private void OnDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        CancelSlowClick();
         if (OpenRowAt(e.OriginalSource as DependencyObject))
         {
             e.Handled = true;
@@ -1245,12 +1245,20 @@ public sealed partial class FileListView : UserControl
     }
 
     /// <summary>
-    /// Opens the entry of the row that contains <paramref name="source"/>: the double-click handler (tests).
+    /// Opens the entry of the row that contains <paramref name="source"/>: the double-click handler (tests). Nothing while a
+    /// slow-click rename is armed.
     /// </summary>
     /// <param name="source">The element that was double-tapped.</param>
     /// <returns>True when a row was opened.</returns>
     public bool OpenRowAt(DependencyObject? source)
     {
+        // Armed = the second press came after the system double-click time (ArmSlowClick): a slow click as in Explorer, so a
+        // double tap WinUI may still raise for it opens nothing (owner). A press within that time never arms.
+        if (_slowClickName is not null)
+        {
+            return false;
+        }
+
         // The control never sets a handled container's Content (owner F11): the row's entry is tracked separately.
         if (Ancestor<SelectorItem>(source, _list) is { } row && _rows is not null && _rows.TryGetItem(row, out var entry))
         {

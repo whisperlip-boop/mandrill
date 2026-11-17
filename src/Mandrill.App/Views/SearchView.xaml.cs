@@ -89,7 +89,8 @@ public sealed partial class SearchView : UserControl
                 e.Handled = true;
             }
         };
-        Results.AddHandler(KeyDownEvent, new KeyEventHandler(OnResultsKeyDown), handledEventsToo: false);
+        // handledEventsToo: ListViewBase marks Enter handled itself, as in the file list.
+        Results.AddHandler(KeyDownEvent, new KeyEventHandler(OnResultsKeyDown), handledEventsToo: true);
         Results.ContextRequested += OnResultsContextRequested;
         Results.DragItemsStarting += OnDragItemsStarting;
         Results.Loaded += (_, _) =>
