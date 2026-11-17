@@ -47,6 +47,10 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     // folder in the parent, as in 1.0.1. Upgrade: match the item by its command's canonical name on more builds.
     private static readonly string[] NewFolderVerbs = ["NewFolder", "{0001DEAD-9BF7-4CFA-8A5C-DE8679340002}"];
 
+    // Windows Terminal's "Open in Terminal" (an Explorer command added at WM_INITMENUPOPUP): its canonical verb is its CLSID,
+    // read from the menu on Windows 10.0.26300 and the same one the Files project filters on.
+    private const string TerminalVerb = "{9F156763-7844-4DC4-B2B1-901F640F5155}";
+
     // An open menu, or a verb's own modal UI (WP-3.1 spike: Shift+"delete" blocks InvokeCommand until its confirmation
     // closes), stays as long as the user wants: only builds count against the hang limit (architecture §7).
     private static readonly TimeSpan UserLimit = TimeSpan.FromHours(1);
@@ -106,7 +110,7 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     {
         ArgumentNullException.ThrowIfNull(request);
         long id = Interlocked.Increment(ref _nextId);
-        var build = _sta.InvokeAsync(() => Build(id, request.Target, request.Owner, request.Extended, forMenu: true, request.Commands, request.CanRename), _hangLimit, ct);
+        var build = _sta.InvokeAsync(() => Build(id, request.Target, request.Owner, request.Extended, forMenu: true, request.Commands, request.CanRename, request.OwnTerminal), _hangLimit, ct);
         var limit = Task.Delay(_buildLimit, ct);
         if (await Task.WhenAny(build, limit).ConfigureAwait(false) != build)
         {
@@ -448,7 +452,10 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
                     // Also when the handler throws (a WM_INITMENUPOPUP failure is routinely logged below on Windows 11).
                     if (msg == PInvoke.WM_INITMENUPOPUP && (nint)wParam.Value == (nint)session.Menu)
                     {
-                        RemoveShellDuplicates(session.Menu, session.Own);
+                        if (session.OwnTerminal)
+                        {
+                            RemoveShellDuplicates(session.Menu, offset => VerbOf(session.Handler, offset));
+                        }
                     }
                 }
             }
@@ -635,7 +642,7 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     }
 
     // Builds the target's menu into this thread's session table under `id`. Returns S_OK or the failing HRESULT.
-    private unsafe int Build(long id, ContextMenuTarget target, nint owner, bool extended, bool forMenu, IReadOnlyList<string>? commands = null, bool canRename = true)
+    private unsafe int Build(long id, ContextMenuTarget target, nint owner, bool extended, bool forMenu, IReadOnlyList<string>? commands = null, bool canRename = true, bool ownTerminal = false)
     {
         BeforeBuild?.Invoke();
 
@@ -730,7 +737,7 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
             if (commands is { Count: > 0 })
             {
                 // §7: Mandrill's own items at the end, after a separator, above the shell's id range (id = 0x8000 + index).
-                // QA N3: a shell item with the same text goes when the menu opens (RemoveShellDuplicates). A failed append
+                // QA N3: the shell's Open in Terminal goes when the menu opens (RemoveShellDuplicates). A failed append
                 // gives the fallback menu instead of a partial list.
                 if (!PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, (PCWSTR)null))
                 {
@@ -756,7 +763,7 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
                 return EAbort;
             }
 
-            (t_sessions ??= []).Add(id, new MenuSession(id, handler, menu, (commands ?? []).Select(Plain).ToHashSet(StringComparer.OrdinalIgnoreCase)));
+            (t_sessions ??= []).Add(id, new MenuSession(id, handler, menu, ownTerminal));
             stored = true;
             return 0;
         }
@@ -808,33 +815,19 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
     }
 
     /// <summary>
-    /// QA N3 (lead): removes the shell's items whose text is one of Mandrill's own (<paramref name="own"/>, plain texts), so
-    /// each command is in the menu once and ours, the known path, stays. Runs when the menu opens, after the shell added its
-    /// lazy Explorer-command items (Windows 11's "Open in Terminal" arrives at WM_INITMENUPOPUP, not at QueryContextMenu).
+    /// QA N3 (lead): removes the shell's "Open in Terminal" (by its canonical verb, so in any display language) when Mandrill
+    /// appended its own, so the command is in the menu once and ours, the known path, stays. Runs when the menu opens, after
+    /// the shell added its lazy Explorer-command items (it arrives at WM_INITMENUPOPUP, not at QueryContextMenu).
     /// </summary>
     /// <param name="menu">The top-level menu.</param>
-    /// <param name="own">Plain texts of Mandrill's own items.</param>
-    // shortcut: matched by text, so it works only when Mandrill's UI language equals the Windows display language; otherwise
-    // both "Open in Terminal" items show. Upgrade: identify the shell's item by its verb instead.
-    internal static unsafe void RemoveShellDuplicates(HMENU menu, IReadOnlySet<string> own)
+    /// <param name="verbOf">The canonical verb of a shell item by its offset from the first command id, or null.</param>
+    internal static void RemoveShellDuplicates(HMENU menu, Func<uint, string?> verbOf)
     {
-        if (own.Count == 0)
-        {
-            return;
-        }
-
         // shortcut: separators around a removed item stay; trim them if a menu ever shows a double line.
-        char* buffer = stackalloc char[256];
         for (int i = PInvoke.GetMenuItemCount(menu) - 1; i >= 0; i--)
         {
             uint id = PInvoke.GetMenuItemID(menu, i);
-            if (id is 0 or uint.MaxValue || id >= FirstOwnCommand)
-            {
-                continue; // a separator, a submenu, or one of ours
-            }
-
-            int length = PInvoke.GetMenuString(menu, (uint)i, buffer, 256, MENU_ITEM_FLAGS.MF_BYPOSITION);
-            if (length > 0 && own.Contains(Plain(new string(buffer, 0, length))))
+            if (id is >= FirstCommand and <= LastCommand && string.Equals(verbOf(id - FirstCommand), TerminalVerb, StringComparison.OrdinalIgnoreCase))
             {
                 PInvoke.DeleteMenu(menu, (uint)i, MENU_ITEM_FLAGS.MF_BYPOSITION);
             }
@@ -973,8 +966,8 @@ public sealed class ContextMenuService : IContextMenuService, IDisposable
         }
     }
 
-    // Own: the texts of Mandrill's own items (Plain), for RemoveShellDuplicates.
-    private sealed record MenuSession(long Id, IContextMenu Handler, HMENU Menu, HashSet<string> Own);
+    // OwnTerminal: Mandrill appended its own Open in Terminal, so RemoveShellDuplicates drops the shell's.
+    private sealed record MenuSession(long Id, IContextMenu Handler, HMENU Menu, bool OwnTerminal);
 
     private sealed record TrackResult(uint Command, string? Verb, ContextMenuResult? Result)
     {

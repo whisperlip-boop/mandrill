@@ -67,7 +67,10 @@ public sealed record ContextMenuTarget(string Folder, IReadOnlyList<string> Name
 /// <param name="CanRename">
 /// The caller has an inline editor (CMF_CANRENAME, the shell's Rename item); false for search results (WP-3.5, lead Q1).
 /// </param>
-public sealed record ContextMenuRequest(ContextMenuTarget Target, nint Owner, int ClientX, int ClientY, bool Extended, IReadOnlyList<string>? Commands = null, bool CanRename = true);
+/// <param name="OwnTerminal">
+/// <paramref name="Commands"/> include Mandrill's Open in Terminal: the shell's own (Windows Terminal's) item is removed.
+/// </param>
+public sealed record ContextMenuRequest(ContextMenuTarget Target, nint Owner, int ClientX, int ClientY, bool Extended, IReadOnlyList<string>? Commands = null, bool CanRename = true, bool OwnTerminal = false);
 
 /// <summary>How a context menu request ended.</summary>
 public enum ContextMenuOutcome

@@ -293,7 +293,8 @@ public sealed class PaneContextMenus : IDisposable
                 : await _menus.ShowAsync(
                     outside
                         ? new ContextMenuRequest(request.Target, _owner(), request.ClientX, request.ClientY, request.Extended, Commands: null, CanRename: false)
-                        : new ContextMenuRequest(request.Target, _owner(), request.ClientX, request.ClientY, request.Extended, [.. commands.Select(c => c.Text)]),
+                        : new ContextMenuRequest(request.Target, _owner(), request.ClientX, request.ClientY, request.Extended, [.. commands.Select(c => c.Text)],
+                            OwnTerminal: commands.Any(c => c.Text == Localizer.Current["context.terminal"])),
                     mine.Token);
         }
         catch (OperationCanceledException) when (mine.IsCancellationRequested)
