@@ -238,7 +238,15 @@ public sealed partial class MainWindow : Window
         ScheduleCount();
         ShowPaneStatus();
         UpdatePaneText();
+        SyncPaneMenuItems();
     }
+
+    // Menu items that act on the active pane's folder: disabled at This PC (and with no pane), like the pane's View dropdown.
+    private void SyncPaneMenuItems() => FilterItem.IsEnabled = _statusPane is { IsThisPc: false };
+
+    // After the menu has closed and given the focus back, so the filter box keeps the caret.
+    private void OnFilterClick(object sender, RoutedEventArgs e)
+        => DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => PaneArea.ActiveView?.OpenFilter());
 
     private void OnItemsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => ScheduleCount();
 
@@ -301,6 +309,12 @@ public sealed partial class MainWindow : Window
                 UpdatePaneText();
                 ShowPaneStatus(); // a favorite's message (and its tooltip) ends with the next navigation
                 break;
+            case nameof(PaneViewModel.IsThisPc):
+                SyncPaneMenuItems();
+                break;
+            case nameof(PaneViewModel.IsFiltered):
+                ScheduleCount();
+                break;
             case nameof(PaneViewModel.IconSize):
                 StatusText.Text = Localizer.Current.Format("status.iconSize", ("size", vm.IconSize));
                 _transientTimer.Interval = TransientStatus;
@@ -352,6 +366,16 @@ public sealed partial class MainWindow : Window
         {
             int count = vm.Items.Count;
             CountText.Text = vm.Items.Current is null ? string.Empty : Localizer.Current.Plural("status.items", count, ("count", count.ToString("N0", CultureInfo.CurrentCulture)));
+        }
+
+        if (vm.IsFiltered && vm.Items.Current is { } shown && CountText.Text.Length > 0)
+        {
+            // ui-spec §2b: shown / total while a filter applies
+            CountText.Text = Localizer.Current.Format(
+                "status.filtered",
+                ("status", CountText.Text),
+                ("shown", shown.Visible.Count.ToString("N0", CultureInfo.CurrentCulture)),
+                ("total", shown.Total.ToString("N0", CultureInfo.CurrentCulture)));
         }
     }
 

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows.Input;
 using Mandrill.App.Icons;
 using Mandrill.App.Platform;
@@ -47,6 +48,7 @@ public sealed partial class PaneView : UserControl
     private IconBitmapCache? _bitmaps;
     private IUiDispatcher? _dispatcher;
     private bool _isActive = true;
+    private bool _filterAlways;
 
     /// <summary>Creates the view; call <see cref="Attach"/> before use.</summary>
     public PaneView()
@@ -135,6 +137,43 @@ public sealed partial class PaneView : UserControl
 
     /// <summary>The tab row (tests).</summary>
     public PaneTabStrip TabStrip => TabRow;
+
+    /// <summary>The quick filter's row, box and toggle button (tests).</summary>
+    public (FrameworkElement Row, TextBox Box, ToggleButton Toggle) Filter => (FilterRow, FilterBox, FilterToggle);
+
+    /// <summary>
+    /// Settings → Filter bar (ui-spec §2b): true keeps the filter row in the pane (Esc and its button only clear the text);
+    /// false shows it on demand (Esc and its button clear and hide it).
+    /// </summary>
+    public bool FilterBarAlways
+    {
+        get => _filterAlways;
+        set
+        {
+            _filterAlways = value;
+            ApplyFilter();
+        }
+    }
+
+    /// <summary>
+    /// The filter toggle, View → Filter or Ctrl+Shift+F: shows the filter row and puts the caret in its box; nothing at
+    /// This PC.
+    /// </summary>
+    public void OpenFilter()
+    {
+        if (_vm is null || _vm.IsThisPc)
+        {
+            return;
+        }
+
+        _vm.IsFilterOpen = true;
+        ApplyFilter();
+        FilterBox.Select(FilterBox.Text.Length, 0);
+        if (!FilterBox.Focus(FocusState.Programmatic))
+        {
+            DispatcherQueue.TryEnqueue(() => FilterBox.Focus(FocusState.Programmatic)); // the row was collapsed until now
+        }
+    }
 
     /// <summary>
     /// Ctrl+F or the Search button: commits an open inline rename first (as Explorer does when another window takes over;
@@ -236,6 +275,7 @@ public sealed partial class PaneView : UserControl
         Describe(OverflowButton, "pane.toolbar.more");
         SetupViewToggle(DetailsViewButton, ViewChoices.Single(c => c.Key == "pane.view.details"));
         SetupViewToggle(LargeIconsViewButton, ViewChoices.Single(c => c.Key == "pane.view.largeIcons"));
+        SetupFilter(vm);
 
         TabRow.Attach(vm, icons);
         PathInput.Attach(vm, _logger);
@@ -550,6 +590,100 @@ public sealed partial class PaneView : UserControl
         };
     }
 
+    // ---- quick filter (ui-spec §2b) -------------------------------------------------------------------------------------
+
+    private void SetupFilter(PaneViewModel vm)
+    {
+        FilterToggle.Content = IconProvider.CreateGlyph(IconProvider.FilterGlyph, size: 14);
+        Describe(FilterToggle, "pane.toolbar.filter");
+        FilterToggle.Click += (_, _) =>
+        {
+            if (!_filterAlways && vm.IsFilterOpen)
+            {
+                DismissFilter();
+            }
+            else
+            {
+                OpenFilter();
+            }
+
+            ApplyFilter(); // a ToggleButton flips itself; the row decides
+        };
+        FilterCloseButton.Content = Icon(IconId.Close);
+        FilterCloseButton.Click += (_, _) => DismissFilter();
+        FilterBox.TextChanged += (_, _) =>
+        {
+            if (vm.FilterText != FilterBox.Text)
+            {
+                vm.FilterText = FilterBox.Text; // live; the pane re-filters what it has loaded (no I/O)
+            }
+        };
+        FilterBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == VirtualKey.Escape)
+            {
+                e.Handled = true;
+                DismissFilter();
+            }
+        };
+        vm.Items.CollectionChanged += (_, _) => UpdateFilterCount();
+        ApplyFilter();
+    }
+
+    // Esc or the row's button: "Always show" only clears the text; "Show when needed" also hides the row.
+    private void DismissFilter()
+    {
+        if (_vm is null)
+        {
+            return;
+        }
+
+        if (_filterAlways)
+        {
+            _vm.FilterText = string.Empty;
+            return;
+        }
+
+        bool refocus = IsFocusIn(FilterRow);
+        _vm.CloseFilter();
+        if (refocus)
+        {
+            FocusList();
+        }
+    }
+
+    private void ApplyFilter()
+    {
+        if (_vm is null)
+        {
+            return;
+        }
+
+        bool available = !_vm.IsThisPc;
+        bool shown = _filterAlways || (available && _vm.IsFilterOpen);
+        if (!shown && IsFocusIn(FilterRow))
+        {
+            FocusList(); // collapsing the focused box would move the focus to the next pane (QA F1)
+        }
+
+        FilterRow.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        FilterBox.IsEnabled = FilterCloseButton.IsEnabled = available; // "Always show" keeps the row at This PC, disabled like the View dropdown
+        FilterToggle.IsEnabled = available;
+        FilterToggle.IsChecked = shown && available;
+        Describe(FilterCloseButton, _filterAlways ? "pane.filter.clear" : "pane.filter.close");
+        UpdateFilterCount();
+    }
+
+    private void UpdateFilterCount()
+    {
+        FilterCount.Text = FilterRow.Visibility == Visibility.Visible && _vm?.Items.Current is { } shown
+            ? Localizer.Current.Format(
+                "pane.filter.count",
+                ("shown", shown.Visible.Count.ToString("N0", CultureInfo.CurrentCulture)),
+                ("total", shown.Total.ToString("N0", CultureInfo.CurrentCulture)))
+            : string.Empty;
+    }
+
     private void SyncViewChecks()
     {
         foreach (var item in _viewItems)
@@ -689,6 +823,13 @@ public sealed partial class PaneView : UserControl
                 break;
             case nameof(PaneViewModel.IsThisPc):
                 ApplyThisPc();
+                ApplyFilter();
+                break;
+            case nameof(PaneViewModel.IsFilterOpen):
+                ApplyFilter();
+                break;
+            case nameof(PaneViewModel.FilterText) when FilterBox.Text != _vm!.FilterText:
+                FilterBox.Text = _vm.FilterText; // cleared by a navigation, or another tab's
                 break;
             case nameof(PaneViewModel.ViewMode):
             case nameof(PaneViewModel.IconSize):
@@ -804,6 +945,7 @@ public sealed partial class PaneView : UserControl
         Add(VirtualKey.L, VirtualKeyModifiers.Control, PathInput.FocusAndSelect, inTextFields: true);
         Add(VirtualKey.D, VirtualKeyModifiers.Menu, PathInput.FocusAndSelect, inTextFields: true);
         Add(VirtualKey.F, VirtualKeyModifiers.Control, RequestSearch, inTextFields: true);
+        Add(VirtualKey.F, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, OpenFilter, inTextFields: true);
         Add(VirtualKey.Delete, VirtualKeyModifiers.None, () => RequestDelete(permanent: false), inTextFields: false);
         AddListKey(VirtualKey.C, VirtualKeyModifiers.Control, () => RequestClipboard(PaneClipboardAction.Copy));
         AddListKey(VirtualKey.X, VirtualKeyModifiers.Control, () => RequestClipboard(PaneClipboardAction.Cut));

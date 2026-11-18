@@ -1,4 +1,5 @@
 using Mandrill.Core.IO;
+using Mandrill.Core.Search;
 using Mandrill.Core.State;
 
 namespace Mandrill.Core.Scanning;
@@ -21,7 +22,8 @@ public enum ScanKind
 /// <param name="Descending">True for descending (folders still come first, AC-1.22).</param>
 /// <param name="ShowHidden">Explorer "show hidden files".</param>
 /// <param name="ShowSystem">Explorer "show protected operating system files".</param>
-public sealed record ViewSpec(SortColumn Column, bool Descending, bool ShowHidden, bool ShowSystem)
+/// <param name="NameFilter">The pane's quick filter (ui-spec §2b): only matching names are shown; null shows all.</param>
+public sealed record ViewSpec(SortColumn Column, bool Descending, bool ShowHidden, bool ShowSystem, NameMatcher? NameFilter = null)
 {
     /// <summary>Name ascending, hidden files hidden (Explorer defaults).</summary>
     public static ViewSpec Default { get; } = new(SortColumn.Name, false, false, false);

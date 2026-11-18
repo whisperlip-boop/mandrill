@@ -235,6 +235,9 @@ public sealed class IconProvider(ILogger? logger = null)
     /// <summary>"More" (U+E712, three dots): the overflow menus (owner: a Windows glyph there).</summary>
     public const string MoreGlyph = "\uE712";
 
+    /// <summary>Segoe Fluent "Filter" (quick filter toggle, ui-spec §2b; no owner SVG for it).</summary>
+    public const string FilterGlyph = "\uE71C";
+
     /// <summary>
     /// A system icon-font glyph (Segoe Fluent Icons, Segoe MDL2 Assets fallback); it inherits the theme foreground like
     /// the monochrome owner icons.

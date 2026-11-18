@@ -335,8 +335,8 @@ public sealed class PaneScanner : IDisposable
         {
             try
             {
-                var visible = Sorter.FilterAndSort(_listing!.Entries, _request.View);
-                Publish(new EntrySnapshot(_shown!.Path, _shown.RedirectedFrom, NextVersion(), visible, true, null, 0, _sw.Elapsed, false), _listing.Entries);
+                var visible = Sorter.FilterAndSort(_listing!.Entries, _request.View, out int total);
+                Publish(new EntrySnapshot(_shown!.Path, _shown.RedirectedFrom, NextVersion(), visible, true, null, 0, _sw.Elapsed, false, total), _listing.Entries);
                 _owner._perf.LogDebug("Resort {Id} {Path}: {Count} entries in {Ms} ms", _id, _shown.Path, visible.Length, _sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
@@ -376,8 +376,8 @@ public sealed class PaneScanner : IDisposable
             if (_owner._cache.TryGet(path, out var cached))
             {
                 // AC-1.13: show the cached listing at once, then re-list and publish a diff against it.
-                var visible = Sorter.FilterAndSort(cached.Entries, _request.View);
-                var snapshot = new EntrySnapshot(path, redirectedFrom, NextVersion(), visible, false, null, 0, _sw.Elapsed, true);
+                var visible = Sorter.FilterAndSort(cached.Entries, _request.View, out int total);
+                var snapshot = new EntrySnapshot(path, redirectedFrom, NextVersion(), visible, false, null, 0, _sw.Elapsed, true, total);
                 if (!Publish(snapshot, cached.Entries))
                 {
                     return;
@@ -400,6 +400,7 @@ public sealed class PaneScanner : IDisposable
             long lastPublishMs = 0;
             long firstMs = -1;
             int firstCount = 0;
+            int total = 0; // shown by the hidden/system rule, before the name filter
             var view = _request.View;
 
             void PublishProgress(int takeFromPending)
@@ -410,7 +411,7 @@ public sealed class PaneScanner : IDisposable
                 comparer ??= Sorter.CreateComparer(view, take);
                 Array.Sort(take, comparer);
                 sorted = sorted.Length == 0 ? take : EntrySorter.Merge(sorted, take, comparer);
-                Publish(new EntrySnapshot(path, redirectedFrom, NextVersion(), sorted, false, null, 0, _sw.Elapsed, false), null);
+                Publish(new EntrySnapshot(path, redirectedFrom, NextVersion(), sorted, false, null, 0, _sw.Elapsed, false, total), null);
                 lastPublishMs = _sw.ElapsedMilliseconds;
             }
 
@@ -422,7 +423,11 @@ public sealed class PaneScanner : IDisposable
                 {
                     if (e.IsVisible(view.ShowHidden, view.ShowSystem))
                     {
-                        pending.Add(e);
+                        total++;
+                        if (view.NameFilter?.IsMatch(e.Name) != false)
+                        {
+                            pending.Add(e);
+                        }
                     }
                 }
 
@@ -456,7 +461,7 @@ public sealed class PaneScanner : IDisposable
             if (comparer is null || view.Column == SortColumn.Type)
             {
                 // Type ranks depend on every extension present, so the final order is computed once over everything.
-                final = Sorter.FilterAndSort(allArray, view);
+                final = Sorter.FilterAndSort(allArray, view, out total);
             }
             else
             {
@@ -467,7 +472,7 @@ public sealed class PaneScanner : IDisposable
 
             long sortMs = sortWatch.ElapsedMilliseconds;
             _ct.ThrowIfCancellationRequested();
-            if (Publish(new EntrySnapshot(path, redirectedFrom, NextVersion(), final, true, null, result.SkippedEntries, _sw.Elapsed, false), allArray))
+            if (Publish(new EntrySnapshot(path, redirectedFrom, NextVersion(), final, true, null, result.SkippedEntries, _sw.Elapsed, false, total), allArray))
             {
                 _owner._cache.Put(path, new CachedListing(path, allArray, DateTime.UtcNow));
                 _owner._perf.LogInformation(
@@ -519,10 +524,10 @@ public sealed class PaneScanner : IDisposable
 
         private void PublishWithDiff(string path, string? redirectedFrom, EntrySnapshot baseSnapshot, FileEntry[] all, int skipped, string kind)
         {
-            var visible = Sorter.FilterAndSort(all, _request.View);
+            var visible = Sorter.FilterAndSort(all, _request.View, out int total);
             var diff = EntryDiffer.Compute(baseSnapshot.Version, baseSnapshot.Visible, visible, MaxDiffChanges);
             _ct.ThrowIfCancellationRequested();
-            if (Publish(new EntrySnapshot(path, redirectedFrom, NextVersion(), visible, true, diff, skipped, _sw.Elapsed, false), all))
+            if (Publish(new EntrySnapshot(path, redirectedFrom, NextVersion(), visible, true, diff, skipped, _sw.Elapsed, false, total), all))
             {
                 _owner._cache.Put(path, new CachedListing(path, all, DateTime.UtcNow));
                 _owner._perf.LogInformation(

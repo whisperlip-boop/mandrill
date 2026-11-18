@@ -167,6 +167,7 @@ public sealed partial class App : Application
                 }
 
                 view.Attach(pane, services.Icons, services.Bitmaps, dispatcher, icons, paneLogger);
+                view.FilterBarAlways = settings.Current.FilterBarAlways;
                 view.AttachTree(services.CreateTree(pane));
                 view.AttachDriveList(services.CreateDriveList(pane));
                 return view;
@@ -189,6 +190,13 @@ public sealed partial class App : Application
                 IsBarVisible = boot.State.ShowFavoritesBar,
             };
             settings.Changed += () => dispatcher.Post(() => favorites.IsBarVisible = settings.Current.ShowFavoritesBar);
+            settings.Changed += () => dispatcher.Post(() =>
+            {
+                foreach (PaneView view in window.Panes.CreatedViews)
+                {
+                    view.FilterBarAlways = settings.Current.FilterBarAlways; // ui-spec §2b: every pane, at once
+                }
+            });
             settings.Changed += () => dispatcher.Post(() =>
             {
                 var theme = AppTheme.Parse(settings.Current.Theme); // applied at once, also to open search popups

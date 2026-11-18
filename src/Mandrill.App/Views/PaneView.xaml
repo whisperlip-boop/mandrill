@@ -130,22 +130,71 @@
                 <ColumnDefinition x:Name="SplitterColumn" Width="Auto" />
                 <ColumnDefinition Width="*" MinWidth="120" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
             <!--  Tree panel: WP-1.9. The column, its width and the toggle already work.  -->
             <Border
                 x:Name="TreeHost"
+                Grid.RowSpan="2"
                 AutomationProperties.Name="{m:Tr Key=pane.tree}"
                 BorderBrush="{ThemeResource MandrillPaneBorderBrush}"
                 BorderThickness="0,0,1,0" />
             <tk:GridSplitter
                 x:Name="TreeSplitter"
                 Grid.Column="1"
+                Grid.RowSpan="2"
                 AutomationProperties.Name="{m:Tr Key=pane.treeSplitter}"
                 Width="5"
                 ResizeBehavior="PreviousAndNext"
                 ResizeDirection="Columns" />
-            <v:FileListView x:Name="Files" Grid.Column="2" />
+            <!--  Quick filter (ui-spec §2b): 28 px above the list, on demand or always (Settings → Filter bar).  -->
+            <Grid
+                x:Name="FilterRow"
+                Grid.Column="2"
+                Height="28"
+                Padding="4,2"
+                BorderBrush="{ThemeResource MandrillPaneBorderBrush}"
+                BorderThickness="0,0,0,1"
+                ColumnSpacing="6"
+                Visibility="Collapsed">
+                <Grid.Resources>
+                    <ResourceDictionary>
+                        <ResourceDictionary.MergedDictionaries>
+                            <ResourceDictionary Source="ms-appx:///Themes/SubtleButtons.xaml" />
+                        </ResourceDictionary.MergedDictionaries>
+                    </ResourceDictionary>
+                </Grid.Resources>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox
+                    x:Name="FilterBox"
+                    MinHeight="0"
+                    Padding="8,2,8,2"
+                    VerticalContentAlignment="Center"
+                    AutomationProperties.Name="{m:Tr Key=pane.filter.box}"
+                    PlaceholderText="{m:Tr Key=pane.filter.box}" />
+                <TextBlock
+                    x:Name="FilterCount"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Button
+                    x:Name="FilterCloseButton"
+                    Grid.Column="2"
+                    Width="24"
+                    Height="24"
+                    Padding="6"
+                    Background="Transparent"
+                    BorderThickness="0" />
+            </Grid>
+            <v:FileListView x:Name="Files" Grid.Row="1" Grid.Column="2" />
             <!--  ADR-0015: shown instead of the file list while the pane is at This PC.  -->
-            <v:DriveListView x:Name="DriveRows" Grid.Column="2" Visibility="Collapsed" />
+            <v:DriveListView x:Name="DriveRows" Grid.Row="1" Grid.Column="2" Visibility="Collapsed" />
         </Grid>
 
         <!--
@@ -168,6 +217,8 @@
                     <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedDisabled" Color="Transparent" />
                 </ResourceDictionary>
             </StackPanel.Resources>
+            <!--  Quick filter toggle (ui-spec §2b): left of Explorer's pair, which stays at the right end.  -->
+            <ToggleButton x:Name="FilterToggle" Style="{StaticResource ViewModeButtonStyle}" />
             <ToggleButton x:Name="DetailsViewButton" Style="{StaticResource ViewModeButtonStyle}" />
             <ToggleButton x:Name="LargeIconsViewButton" Style="{StaticResource ViewModeButtonStyle}" />
         </StackPanel>

@@ -28,6 +28,7 @@
                 Header="{m:Tr Key=dialog.settings.favoritesBar}"
                 OffContent="{m:Tr Key=dialog.settings.off}"
                 OnContent="{m:Tr Key=dialog.settings.on}" />
+            <RadioButtons x:Name="FilterBarChoice" Header="{m:Tr Key=dialog.settings.filterBar}" />
             <StackPanel Spacing="8">
                 <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{m:Tr Key=dialog.settings.layoutDefaults}" TextWrapping="Wrap" />
                 <RadioButtons x:Name="TwoPaneChoice" Header="{m:Tr Key=dialog.settings.layoutDefaults.two}" />

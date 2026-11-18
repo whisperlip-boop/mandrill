@@ -32,17 +32,29 @@ public sealed class EntrySorter
     /// <param name="entries">Entries in any order.</param>
     /// <param name="view">Filter and order.</param>
     /// <returns>Sorted visible entries.</returns>
-    public FileEntry[] FilterAndSort(IReadOnlyList<FileEntry> entries, ViewSpec view)
+    public FileEntry[] FilterAndSort(IReadOnlyList<FileEntry> entries, ViewSpec view) => FilterAndSort(entries, view, out _);
+
+    /// <summary>Returns the visible entries of <paramref name="entries"/> in display order (new array; input untouched).</summary>
+    /// <param name="entries">Entries in any order.</param>
+    /// <param name="view">Filter and order.</param>
+    /// <param name="total">Entries the hidden/system rule shows, before <see cref="ViewSpec.NameFilter"/>.</param>
+    /// <returns>Sorted visible entries.</returns>
+    public FileEntry[] FilterAndSort(IReadOnlyList<FileEntry> entries, ViewSpec view, out int total)
     {
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(view);
         var visible = new FileEntry[entries.Count];
         int n = 0;
+        total = 0;
         foreach (var e in entries)
         {
             if (e.IsVisible(view.ShowHidden, view.ShowSystem))
             {
-                visible[n++] = e;
+                total++;
+                if (view.NameFilter?.IsMatch(e.Name) != false)
+                {
+                    visible[n++] = e;
+                }
             }
         }
 

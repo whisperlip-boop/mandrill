@@ -742,6 +742,13 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
 
         var request = new Request(RequestKind.Navigate, origin, path, statusOnCommit) { KeepOnFailure = keepOnFailure };
         _request = request;
+        if (origin is not (NavOrigin.Tab or NavOrigin.Refresh) && !PathUtil.PathEquals(path, CurrentPath))
+        {
+            // Another folder starts unfiltered (ui-spec §2b); a failure that keeps this folder puts the filter back.
+            request.FilterBefore = (FilterText, IsFilterOpen);
+            SetFilterSilently(string.Empty, open: false);
+        }
+
         _dirtyWhileLoading = false;
         _resortWhenDone = false;
         IsLoading = true;
@@ -836,7 +843,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             explorer = new HiddenFilesSetting(false, false);
         }
 
-        return new ViewSpec(SortColumn, SortDescending, ShowHiddenOverride ?? explorer.ShowHidden, explorer.ShowProtectedSystem);
+        return new ViewSpec(SortColumn, SortDescending, ShowHiddenOverride ?? explorer.ShowHidden, explorer.ShowProtectedSystem, FilterMatcher);
     }
 
     private void OnSnapshot(long id, EntrySnapshot snapshot)
@@ -917,6 +924,11 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             }
             else if (request.Origin == NavOrigin.Typed || request.KeepOnFailure)
             {
+                if (request.FilterBefore is { } filter)
+                {
+                    SetFilterSilently(filter.Text, filter.Open); // the shown listing still has it
+                }
+
                 PathError = request.Origin == NavOrigin.Typed;
                 Status = ErrorStatus(error);
                 request.Completion.TrySetResult(new NavigationResult(NavigationOutcome.Failed, request.Path, Error: error));
@@ -1004,6 +1016,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     private NavigationResult ShowThisPc(NavOrigin origin, PaneStatus? status, string? select)
     {
         StopShowingFolder();
+        SetFilterSilently(string.Empty, open: false); // no filter at This PC
         switch (origin)
         {
             case NavOrigin.Back or NavOrigin.Forward or NavOrigin.Fallback or NavOrigin.Tab:
@@ -1229,6 +1242,9 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         public bool Committed { get; set; }
 
         public bool Final { get; set; }
+
+        // The filter this navigation cleared (ui-spec §2b).
+        public (string Text, bool Open)? FilterBefore { get; set; }
 
         public TaskCompletionSource<NavigationResult> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }

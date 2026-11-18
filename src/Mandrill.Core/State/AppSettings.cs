@@ -10,7 +10,8 @@ namespace Mandrill.Core.State;
 /// <param name="LayoutDefaults">Default arrangement for 2 and 3 panes (AC-1.3b).</param>
 /// <param name="Index">Index options (Phase 2; stored now so the schema does not change).</param>
 /// <param name="Theme">"system", "light", "dark" or "highcontrast" (owner round 5 #5); absent in older files, so it defaults to "system".</param>
-public sealed record AppSettings(string Language, bool ShowFavoritesBar, LayoutDefaults LayoutDefaults, IndexSettings Index, string Theme = AppSettings.ThemeSystem)
+/// <param name="FilterBarAlways">Filter bar (ui-spec §2b): true = always shown in every pane, false = shown when needed (default; absent in older files).</param>
+public sealed record AppSettings(string Language, bool ShowFavoritesBar, LayoutDefaults LayoutDefaults, IndexSettings Index, string Theme = AppSettings.ThemeSystem, bool FilterBarAlways = false)
     : IStateDocument<AppSettings>
 {
     /// <summary>Follow the Windows UI language.</summary>
@@ -49,7 +50,8 @@ public sealed record AppSettings(string Language, bool ShowFavoritesBar, LayoutD
             ShowFavoritesBar,
             Fixes.Check(fixes, "layoutDefaults", LayoutDefaults, LayoutDefaults is not null, LayoutDefaults.Default).Normalize(fixes),
             Fixes.Check(fixes, "index", Index, Index is not null, IndexSettings.Default).Normalize(fixes),
-            Fixes.Check(fixes, "theme", theme ?? Theme!, theme is not null, ThemeSystem));
+            Fixes.Check(fixes, "theme", theme ?? Theme!, theme is not null, ThemeSystem),
+            FilterBarAlways);
     }
 
     private static string? Known(string? value, params string[] allowed)

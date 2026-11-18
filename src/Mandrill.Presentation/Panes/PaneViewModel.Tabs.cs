@@ -46,6 +46,7 @@ public sealed partial class PaneViewModel
 
         ActiveTab.ViewMode = ViewMode;
         ActiveTab.Sort = new SortState(SortColumn, SortDescending);
+        ActiveTab.Filter = (FilterText, IsFilterOpen);
 
         // Until the tab's folder commits the pane shows nothing (as before a first navigation), so nothing can read the
         // outgoing tab's folder as this tab's: session capture, Up, Refresh/Retry, Gone, a hide and re-show (review C1).
@@ -59,6 +60,7 @@ public sealed partial class PaneViewModel
         ViewMode = tab.ViewMode;
         SortColumn = tab.Sort.Column;
         SortDescending = tab.Sort.Descending;
+        SetFilterSilently(tab.Filter.Text, tab.Filter.Open); // the navigation below scans with it
 
         // An interrupted Back/Forward already moved the history, so its target wins over the last committed location.
         string? target = tab.History.Current ?? (tab.Location.Length > 0 ? tab.Location : _context.HomeFolder);

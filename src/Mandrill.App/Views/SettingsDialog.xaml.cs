@@ -29,6 +29,13 @@ public sealed partial class SettingsDialog : ContentDialog
         (AppSettings.ThemeHighContrast, "dialog.settings.theme.contrast"),
     ];
 
+    // Index 1 = always (AppSettings.FilterBarAlways); ui-spec §2b.
+    private static readonly (string Value, string Key)[] FilterBars =
+    [
+        ("auto", "dialog.settings.filterBar.auto"),
+        ("always", "dialog.settings.filterBar.always"),
+    ];
+
     private static readonly string[] TwoPaneLayouts = [LayoutKeys.TwoLeftRight, LayoutKeys.TwoTopBottom];
 
     private static readonly string[] ThreePaneLayouts = [LayoutKeys.ThreeLeft1Right2, LayoutKeys.ThreeLeft2Right1, LayoutKeys.ThreeTop1Bottom2, LayoutKeys.ThreeTop2Bottom1];
@@ -54,6 +61,7 @@ public sealed partial class SettingsDialog : ContentDialog
         InitializeComponent();
         Fill(ThemeChoice, Themes, current.Theme);
         FavoritesBarToggle.IsOn = current.ShowFavoritesBar;
+        Fill(FilterBarChoice, FilterBars, current.FilterBarAlways ? "always" : "auto");
         Fill(TwoPaneChoice, TwoPaneLayouts, current.LayoutDefaults.TwoPanes, icons);
         Fill(ThreePaneChoice, ThreePaneLayouts, current.LayoutDefaults.ThreePanes, icons);
         AttachIndex();
@@ -69,6 +77,7 @@ public sealed partial class SettingsDialog : ContentDialog
     {
         Theme = Themes[Math.Clamp(ThemeChoice.SelectedIndex, 0, Themes.Length - 1)].Value,
         ShowFavoritesBar = FavoritesBarToggle.IsOn,
+        FilterBarAlways = FilterBarChoice.SelectedIndex == 1,
         LayoutDefaults = new LayoutDefaults(
             TwoPaneLayouts[Math.Clamp(TwoPaneChoice.SelectedIndex, 0, TwoPaneLayouts.Length - 1)],
             ThreePaneLayouts[Math.Clamp(ThreePaneChoice.SelectedIndex, 0, ThreePaneLayouts.Length - 1)]),

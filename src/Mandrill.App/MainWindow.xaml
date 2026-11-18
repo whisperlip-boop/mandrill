@@ -74,6 +74,12 @@
                         <KeyboardAccelerator Key="B" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <!--  ui-spec §2b: the pane's own Ctrl+Shift+F does the same; disabled at This PC.  -->
+                <MenuFlyoutItem
+                    x:Name="FilterItem"
+                    Click="OnFilterClick"
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+F"
+                    Text="{m:Tr Key=menu.view.filter}" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     x:Name="AddPaneItem"

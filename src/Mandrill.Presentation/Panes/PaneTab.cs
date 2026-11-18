@@ -43,6 +43,9 @@ public sealed partial class PaneTab : ObservableObject
 
     internal SortState Sort { get; set; }
 
+    // Quick filter (ui-spec §2b): memory only, never saved.
+    internal (string Text, bool Open) Filter { get; set; } = (string.Empty, false);
+
     internal NavHistory History { get; } = new();
 
     internal TabState ToState() => new(Location, ViewMode, Sort, Color);

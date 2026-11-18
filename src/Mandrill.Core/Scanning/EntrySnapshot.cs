@@ -24,9 +24,10 @@ public sealed class EntrySnapshot
 {
     private readonly Dictionary<string, int> _indexByName;
 
-    internal EntrySnapshot(string path, string? redirectedFrom, long version, FileEntry[] visible, bool isFinal, EntryDiff? diff, int skipped, TimeSpan elapsed, bool fromCache)
+    internal EntrySnapshot(string path, string? redirectedFrom, long version, FileEntry[] visible, bool isFinal, EntryDiff? diff, int skipped, TimeSpan elapsed, bool fromCache, int total)
     {
         Path = path;
+        Total = total;
         RedirectedFrom = redirectedFrom;
         Version = version;
         Visible = visible;
@@ -53,6 +54,9 @@ public sealed class EntrySnapshot
 
     /// <summary>Visible entries in display order.</summary>
     public IReadOnlyList<FileEntry> Visible { get; }
+
+    /// <summary>Entries the hidden/system rule shows, before the name filter (= <see cref="Visible"/>.Count without one).</summary>
+    public int Total { get; }
 
     /// <summary>True for the last snapshot of a request.</summary>
     public bool IsFinal { get; }
