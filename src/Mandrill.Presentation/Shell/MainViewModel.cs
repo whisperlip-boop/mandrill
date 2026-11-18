@@ -36,6 +36,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Raised when the user chose About; the view opens the About dialog (WP-1.11).</summary>
     public event EventHandler? AboutRequested;
 
+    /// <summary>Raised for File → Keyboard shortcuts… or F1; the view opens the shortcuts dialog (ui-spec §11).</summary>
+    public event EventHandler? ShortcutsRequested;
+
     /// <summary>Raised with a localized message for the status bar.</summary>
     public event Action<string>? StatusRequested;
 
@@ -110,6 +113,13 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _logger.LogInformation("Language picker requested from the menu");
         LanguageRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    [RelayCommand]
+    private void OpenShortcuts()
+    {
+        _logger.LogInformation("Keyboard shortcuts requested");
+        ShortcutsRequested?.Invoke(this, EventArgs.Empty);
     }
 
     [RelayCommand]

@@ -62,6 +62,30 @@ public sealed class DialogLauncher
         main.SettingsRequested += (_, _) => _ = ShowSettingsAsync();
         main.LanguageRequested += (_, _) => _ = ShowLanguageAsync();
         main.AboutRequested += (_, _) => _ = ShowAboutAsync();
+        main.ShortcutsRequested += (_, _) => _ = ShowShortcutsAsync();
+    }
+
+    private async Task ShowShortcutsAsync()
+    {
+        if (_open || _window.Content?.XamlRoot is not { } root)
+        {
+            return; // F1 while another dialog is open does nothing
+        }
+
+        _open = true;
+        try
+        {
+            await new ShortcutsDialog { XamlRoot = root, RequestedTheme = AppTheme.Of(root) }.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Keyboard shortcuts dialog failed");
+            _showStatus(Localizer.Current["error.unexpected"]);
+        }
+        finally
+        {
+            _open = false;
+        }
     }
 
     // L1: a new choice is saved at once and applies after a restart; "Restart now" goes through the normal exit (session saved).
