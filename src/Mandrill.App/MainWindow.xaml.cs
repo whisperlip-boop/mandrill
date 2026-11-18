@@ -242,8 +242,13 @@ public sealed partial class MainWindow : Window
         SyncPaneMenuItems();
     }
 
-    // Menu items that act on the active pane's folder: disabled at This PC (and with no pane), like the pane's View dropdown.
-    private void SyncPaneMenuItems() => FilterItem.IsEnabled = ExportItem.IsEnabled = _statusPane is { IsThisPc: false };
+    // Menu items that act on the active pane's folder: disabled at This PC (and with no pane), like the pane's View dropdown;
+    // Export also until the folder is listed completely.
+    private void SyncPaneMenuItems()
+    {
+        FilterItem.IsEnabled = _statusPane is { IsThisPc: false };
+        ExportItem.IsEnabled = _statusPane is { CanExportList: true };
+    }
 
     // File → Export file list (ui-spec §10): the save dialog here, the writing in Core (through the pane).
     private async void OnExportClick(object sender, RoutedEventArgs e)
@@ -344,6 +349,9 @@ public sealed partial class MainWindow : Window
                 ShowPaneStatus(); // a favorite's message (and its tooltip) ends with the next navigation
                 break;
             case nameof(PaneViewModel.IsThisPc):
+            case nameof(PaneViewModel.IsLoading):
+            case nameof(PaneViewModel.CurrentPath):
+            case nameof(PaneViewModel.FolderError):
                 SyncPaneMenuItems();
                 break;
             case nameof(PaneViewModel.IsFiltered):

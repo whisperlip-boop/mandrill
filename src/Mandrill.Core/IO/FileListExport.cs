@@ -90,7 +90,7 @@ public static class FileListExport
 
     private static FsError? Export(string target, IReadOnlyList<FileEntry> entries, string folder, FileListFormat format, IReadOnlyList<string> headers, Func<FileEntry, string> typeName, ILogger logger)
     {
-        string tmp = $"{target}.tmp.{Environment.ProcessId}";
+        string tmp = PathUtil.ToIo($"{target}.tmp.{Environment.ProcessId}"); // long paths, as IndexFile
         try
         {
             byte[] bytes = Build(entries, folder, format, headers, typeName);
@@ -100,7 +100,7 @@ public static class FileListExport
                 stream.Flush(flushToDisk: true);
             }
 
-            File.Move(tmp, target, overwrite: true);
+            File.Move(tmp, PathUtil.ToIo(target), overwrite: true);
             logger.LogInformation("Exported {Count} entries of {Folder} as {Format} to {File}", entries.Count, folder, format, target);
             return null;
         }

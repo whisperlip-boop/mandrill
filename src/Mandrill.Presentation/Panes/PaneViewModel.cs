@@ -740,19 +740,15 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             _pendingSelect = select; // set after the reset above, before the scan can deliver a snapshot
         }
 
-        var request = new Request(RequestKind.Navigate, origin, path, statusOnCommit) { KeepOnFailure = keepOnFailure };
+        // Another folder starts unfiltered (ui-spec §2b): scanned without the filter, which is cleared only when it commits,
+        // so the folder still shown keeps its filter visible meanwhile, also when this navigation fails or is superseded.
+        bool clearsFilter = origin is not (NavOrigin.Tab or NavOrigin.Refresh) && !PathUtil.PathEquals(path, CurrentPath);
+        var request = new Request(RequestKind.Navigate, origin, path, statusOnCommit) { KeepOnFailure = keepOnFailure, ClearsFilter = clearsFilter };
         _request = request;
-        if (origin is not (NavOrigin.Tab or NavOrigin.Refresh) && !PathUtil.PathEquals(path, CurrentPath))
-        {
-            // Another folder starts unfiltered (ui-spec §2b); a failure that keeps this folder puts the filter back.
-            request.FilterBefore = (FilterText, IsFilterOpen);
-            SetFilterSilently(string.Empty, open: false);
-        }
-
         _dirtyWhileLoading = false;
         _resortWhenDone = false;
         IsLoading = true;
-        request.Id = _scanner.Scan(new ScanRequest(path, CurrentView(), ScanKind.Cold, FallbackToAncestor: fallback), _sink);
+        request.Id = _scanner.Scan(new ScanRequest(path, CurrentView(withFilter: !clearsFilter), ScanKind.Cold, FallbackToAncestor: fallback), _sink);
         return request.Completion.Task;
     }
 
@@ -778,15 +774,21 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
 
     private void Resort()
     {
-        if (Items.Current is null || _disposed)
+        if (_disposed)
         {
             return;
         }
 
+        // Before the empty check: a filter typed after a tab switch, before its first snapshot, applies once it is listed.
         if (_request is { Final: false })
         {
             // A running navigation or update must finish first; it already uses the new view only if it started after.
             _resortWhenDone = true;
+            return;
+        }
+
+        if (Items.Current is null)
+        {
             return;
         }
 
@@ -830,7 +832,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         });
     }
 
-    private ViewSpec CurrentView()
+    private ViewSpec CurrentView(bool withFilter = true)
     {
         HiddenFilesSetting explorer;
         try
@@ -843,7 +845,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             explorer = new HiddenFilesSetting(false, false);
         }
 
-        return new ViewSpec(SortColumn, SortDescending, ShowHiddenOverride ?? explorer.ShowHidden, explorer.ShowProtectedSystem, FilterMatcher);
+        return new ViewSpec(SortColumn, SortDescending, ShowHiddenOverride ?? explorer.ShowHidden, explorer.ShowProtectedSystem, withFilter ? FilterMatcher : null);
     }
 
     private void OnSnapshot(long id, EntrySnapshot snapshot)
@@ -924,11 +926,6 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             }
             else if (request.Origin == NavOrigin.Typed || request.KeepOnFailure)
             {
-                if (request.FilterBefore is { } filter)
-                {
-                    SetFilterSilently(filter.Text, filter.Open); // the shown listing still has it
-                }
-
                 PathError = request.Origin == NavOrigin.Typed;
                 Status = ErrorStatus(error);
                 request.Completion.TrySetResult(new NavigationResult(NavigationOutcome.Failed, request.Path, Error: error));
@@ -973,6 +970,11 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     private void Commit(Request request, string path, string? redirectedFrom)
     {
         request.Committed = true;
+        if (request.ClearsFilter)
+        {
+            SetFilterSilently(string.Empty, open: false); // the scan already ran without it
+        }
+
         _reconcileIfKept = false;
         switch (request.Origin)
         {
@@ -1243,8 +1245,8 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
 
         public bool Final { get; set; }
 
-        // The filter this navigation cleared (ui-spec §2b).
-        public (string Text, bool Open)? FilterBefore { get; set; }
+        // A navigation to another folder: scanned unfiltered, clears the filter when it commits (ui-spec §2b).
+        public bool ClearsFilter { get; init; }
 
         public TaskCompletionSource<NavigationResult> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }

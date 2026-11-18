@@ -10,8 +10,11 @@ public sealed partial class PaneViewModel
     private static readonly string[] ExportHeaderKeys =
         ["export.column.name", "export.column.path", "export.column.modified", "export.column.type", "export.column.size"];
 
-    /// <summary>Whether the pane shows a folder whose list can be exported (not This PC, not an error).</summary>
-    public bool CanExportList => !IsThisPc && CurrentPath is not null && Items.Current is not null;
+    /// <summary>
+    /// Whether the pane shows a folder whose list can be exported: not This PC, not an error, and listed completely (a
+    /// folder still loading would be exported in part).
+    /// </summary>
+    public bool CanExportList => !IsThisPc && CurrentPath is not null && Items.Current is { IsFinal: true };
 
     /// <summary>
     /// Writes the shown list to <paramref name="target"/>: the selection when two or more items are selected, else every

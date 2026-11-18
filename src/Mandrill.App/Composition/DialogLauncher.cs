@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Mandrill.App.Icons;
 using Mandrill.App.Platform;
 using Mandrill.App.Views;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Mandrill.App.Composition;
 
@@ -65,11 +67,19 @@ public sealed class DialogLauncher
         main.ShortcutsRequested += (_, _) => _ = ShowShortcutsAsync();
     }
 
+    // One dialog at a time (WinUI shows a single ContentDialog per window): neither one of these nor another ContentDialog,
+    // e.g. the rename extension question, favorites or folder access; then F1 or a menu item does nothing (ui-spec §11).
+    private bool CanOpenDialog([NotNullWhen(true)] out XamlRoot? root)
+    {
+        root = _window.Content?.XamlRoot;
+        return !_open && root is not null && !VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(p => p.Child is ContentDialog);
+    }
+
     private async Task ShowShortcutsAsync()
     {
-        if (_open || _window.Content?.XamlRoot is not { } root)
+        if (!CanOpenDialog(out XamlRoot? root))
         {
-            return; // F1 while another dialog is open does nothing
+            return;
         }
 
         _open = true;
@@ -91,7 +101,7 @@ public sealed class DialogLauncher
     // L1: a new choice is saved at once and applies after a restart; "Restart now" goes through the normal exit (session saved).
     private async Task ShowLanguageAsync()
     {
-        if (_open || _window.Content?.XamlRoot is not { } root)
+        if (!CanOpenDialog(out XamlRoot? root))
         {
             return;
         }
@@ -155,7 +165,7 @@ public sealed class DialogLauncher
 
     private async Task ShowSettingsAsync()
     {
-        if (_open || _window.Content?.XamlRoot is not { } root)
+        if (!CanOpenDialog(out XamlRoot? root))
         {
             return;
         }
@@ -217,7 +227,7 @@ public sealed class DialogLauncher
 
     private async Task ShowAboutAsync()
     {
-        if (_open || _window.Content?.XamlRoot is not { } root)
+        if (!CanOpenDialog(out XamlRoot? root))
         {
             return;
         }

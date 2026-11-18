@@ -21,12 +21,13 @@ public sealed partial class PaneViewModel
             if (SetProperty(ref _filterText, value ?? string.Empty))
             {
                 OnPropertyChanged(nameof(IsFiltered));
+                IsFilterOpen |= IsFiltered; // typed under "Always show": switching to "Show when needed" keeps the row
                 Resort(); // a running load finishes first, then the shown folder is re-filtered once
             }
         }
     }
 
-    /// <summary>Whether the filter row is open (the "Show when needed" setting); per tab.</summary>
+    /// <summary>Whether the filter row is open (the "Show when needed" setting); per tab. Always true while a filter applies.</summary>
     [ObservableProperty]
     public partial bool IsFilterOpen { get; set; }
 
@@ -50,6 +51,6 @@ public sealed partial class PaneViewModel
             OnPropertyChanged(nameof(IsFiltered));
         }
 
-        IsFilterOpen = open;
+        IsFilterOpen = open || IsFiltered;
     }
 }
