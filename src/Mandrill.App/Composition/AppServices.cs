@@ -79,6 +79,7 @@ public sealed class AppServices : IDisposable
             HiddenFiles = ExplorerSettings.ReadHiddenFiles,
             LoggerFactory = loggerFactory,
             EnsureTypeNames = (ids, ct) => TypeNames.EnsureResolvedAsync(ids, ct),
+            TypeName = Icons.TypeName, // thread-safe cache lookup
         };
     }
 

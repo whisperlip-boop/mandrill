@@ -115,6 +115,11 @@ public sealed class PaneContext
     public Func<IReadOnlyCollection<int>, CancellationToken, Task>? EnsureTypeNames { get; init; }
 
     /// <summary>
+    /// The Details view's Type text of an entry, callable on any thread (export, ui-spec §10); null writes an empty type.
+    /// </summary>
+    public Func<FileEntry, string>? TypeName { get; init; }
+
+    /// <summary>
     /// Shows the shell's "Open with" dialog for a file whose type has no associated app (WP-3.3, Explorer parity, §15 (d));
     /// true when the dialog ran. Null (P1, tests) keeps the "no associated app" message.
     /// </summary>

@@ -55,6 +55,12 @@
                     KeyboardAcceleratorTextOverride="Ctrl+N"
                     Text="{m:Tr Key=menu.file.newWindow}" />
                 <MenuFlyoutSeparator />
+                <!--  ui-spec §10: the active pane's shown list; no shortcut; disabled at This PC.  -->
+                <MenuFlyoutItem
+                    x:Name="ExportItem"
+                    Click="OnExportClick"
+                    Text="{m:Tr Key=menu.file.export}" />
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     x:Name="SettingsItem"
                     Command="{x:Bind ViewModel.OpenSettingsCommand}"

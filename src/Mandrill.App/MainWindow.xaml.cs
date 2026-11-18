@@ -4,6 +4,7 @@ using Mandrill.App.Icons;
 using Mandrill.App.Platform;
 using Mandrill.App.Views;
 using Mandrill.Core.Diagnostics;
+using Mandrill.Core.IO;
 using Mandrill.Core.Localization;
 using Mandrill.Core.Platform;
 using Mandrill.Presentation.Favorites;
@@ -242,7 +243,40 @@ public sealed partial class MainWindow : Window
     }
 
     // Menu items that act on the active pane's folder: disabled at This PC (and with no pane), like the pane's View dropdown.
-    private void SyncPaneMenuItems() => FilterItem.IsEnabled = _statusPane is { IsThisPc: false };
+    private void SyncPaneMenuItems() => FilterItem.IsEnabled = ExportItem.IsEnabled = _statusPane is { IsThisPc: false };
+
+    // File → Export file list (ui-spec §10): the save dialog here, the writing in Core (through the pane).
+    private async void OnExportClick(object sender, RoutedEventArgs e)
+    {
+        if (_statusPane is not { CanExportList: true, CurrentPath: { } folder } pane)
+        {
+            return;
+        }
+
+        try
+        {
+            var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(AppWindow.Id)
+            {
+                SuggestedFileName = PathUtil.IsDriveRoot(folder) ? folder[..1] : PathUtil.LeafName(folder),
+                DefaultFileExtension = ".csv",
+            };
+            picker.FileTypeChoices.Add(Localizer.Current["export.type.csv"], [".csv"]);
+            picker.FileTypeChoices.Add(Localizer.Current["export.type.txt"], [".txt"]);
+            var result = await picker.PickSaveFileAsync();
+            if (result is null)
+            {
+                return; // cancelled
+            }
+
+            var format = result.Path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ? FileListFormat.Txt : FileListFormat.Csv;
+            await pane.ExportListAsync(result.Path, format);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Export file list failed");
+            StatusText.Text = Localizer.Current["error.unexpected"];
+        }
+    }
 
     // After the menu has closed and given the focus back, so the filter box keeps the caret.
     private void OnFilterClick(object sender, RoutedEventArgs e)

@@ -2,6 +2,7 @@
   "app.title": "Mandrill",
   "menu.file": "File",
   "menu.file.newWindow": "New window",
+  "menu.file.export": "Export file list…",
   "menu.file.settings": "Settings…",
   "menu.file.language": "Language…",
   "menu.file.exit": "Exit",
@@ -269,5 +270,14 @@
   "dialog.access.detail": "Click Continue to permanently get access to this folder.",
   "dialog.access.continue": "Continue",
   "dialog.access.cancel": "Cancel",
-  "pane.error.grantFailed": "Access to {path} could not be granted. See log."
+  "pane.error.grantFailed": "Access to {path} could not be granted. See log.",
+  "export.type.csv": "CSV (comma-separated values)",
+  "export.type.txt": "Text file (names only)",
+  "export.column.name": "Name",
+  "export.column.path": "Full path",
+  "export.column.modified": "Date modified",
+  "export.column.type": "Type",
+  "export.column.size": "Size in bytes",
+  "export.done": "File list exported ({count}): {path}",
+  "export.failed": "The file list could not be saved to {path}. See log."
 }
