@@ -393,8 +393,16 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
             _logger.LogInformation("Created {Path}", created);
             if (CurrentPath is { } now && PathUtil.PathEquals(now, dir))
             {
-                _pendingSelect = (PathUtil.LeafName(created), true);
-                StartUpdate(ScanKind.Partial, [PathUtil.LeafName(created)]);
+                string leaf = PathUtil.LeafName(created);
+                if (FilterMatcher is { } filter && !filter.IsMatch(leaf))
+                {
+                    // The new item must be visible to be renamed (QA M3, lead): the filter is cleared as by Esc ("Show when
+                    // needed" hides the row, "Always show" keeps it empty); the update below lists the folder without it.
+                    SetFilterSilently(string.Empty, open: false);
+                }
+
+                _pendingSelect = (leaf, true);
+                StartUpdate(ScanKind.Partial, [leaf]);
             }
         });
     }

@@ -221,7 +221,7 @@ public sealed partial class MainWindow : Window
             if (_statusPane is { } old)
             {
                 old.Items.CollectionChanged -= OnItemsChanged;
-                old.Items.Reset -= ScheduleCount;
+                old.Items.CurrentChanged -= ScheduleCount;
                 old.Items.Selection.Changed -= ScheduleCount;
                 old.PropertyChanged -= OnPaneChanged;
             }
@@ -230,7 +230,7 @@ public sealed partial class MainWindow : Window
             if (active is not null)
             {
                 active.Items.CollectionChanged += OnItemsChanged;
-                active.Items.Reset += ScheduleCount;
+                active.Items.CurrentChanged += ScheduleCount; // also a diff that changes only the filter's total (QA M2)
                 active.Items.Selection.Changed += ScheduleCount;
                 active.PropertyChanged += OnPaneChanged;
             }

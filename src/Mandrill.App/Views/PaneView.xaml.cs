@@ -290,6 +290,7 @@ public sealed partial class PaneView : UserControl
             AttachList();
         }
         AddShortcuts();
+        PreviewKeyDown += OnPanePreviewKeyDown;
         vm.PropertyChanged += OnViewModelChanged;
         vm.AccessPromptRequested += OnAccessPromptRequested;
         ApplyTree();
@@ -626,7 +627,7 @@ public sealed partial class PaneView : UserControl
                 DismissFilter();
             }
         };
-        vm.Items.CollectionChanged += (_, _) => UpdateFilterCount();
+        vm.Items.CurrentChanged += UpdateFilterCount; // every applied snapshot, also one that changes only the total (QA M2)
         ApplyFilter();
     }
 
@@ -955,20 +956,27 @@ public sealed partial class PaneView : UserControl
         Add(VirtualKey.Delete, VirtualKeyModifiers.Shift, () => RequestDelete(permanent: true), inTextFields: false);
 
         // Tabs (ui-spec §2a): opening and closing stay silent while typing (a rename or the path box keeps its text).
-        // Switching also works in the path and filter boxes, but not during a rename: the folder change would drop it, and
-        // committing first is unsafe while the extension question is open.
+        // Ctrl+Tab / Ctrl+Shift+Tab: OnPreviewKeyDown.
         Add(VirtualKey.T, VirtualKeyModifiers.Control, () => _ = _vm!.NewTabAsync(), inTextFields: false);
         Add(VirtualKey.W, VirtualKeyModifiers.Control, () => _vm!.CloseTab(_vm.ActiveTab), inTextFields: false);
         Add(VirtualKey.T, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () => _ = _vm!.ReopenClosedTabAsync(), inTextFields: false);
-        Add(VirtualKey.Tab, VirtualKeyModifiers.Control, () => SwitchTab(forward: true), inTextFields: true);
-        Add(VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () => SwitchTab(forward: false), inTextFields: true);
     }
 
-    private void SwitchTab(bool forward)
+    // Ctrl+Tab / Ctrl+Shift+Tab (ui-spec §2a): tunnelling, because a focused text box would insert a TAB before any
+    // accelerator ran (QA M1: the rename box, path box and filter box all did). The key is always taken; it switches tabs
+    // except during a rename, whose text a folder change would drop (committing first is unsafe while the extension
+    // question is open).
+    private void OnPanePreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (e.Key != VirtualKey.Tab || _vm is null || !FileListView.IsControlDown())
+        {
+            return;
+        }
+
+        e.Handled = true;
         if (!Files.IsRenaming)
         {
-            _ = _vm!.ActivateNextTabAsync(forward);
+            _ = _vm.ActivateNextTabAsync(forward: !FileListView.IsShiftDown());
         }
     }
 

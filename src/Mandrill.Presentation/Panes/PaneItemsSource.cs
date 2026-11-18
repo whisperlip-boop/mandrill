@@ -27,6 +27,12 @@ public sealed class PaneItemsSource : IList, INotifyCollectionChanged
     /// <summary>Raised just after a Reset.</summary>
     public event Action? Reset;
 
+    /// <summary>
+    /// Raised after every Replace, Apply or Clear, once <see cref="Current"/> is the new snapshot: also for a diff that
+    /// changed nothing shown (only <see cref="EntrySnapshot.Total"/>), which raises no collection notification (QA M2).
+    /// </summary>
+    public event Action? CurrentChanged;
+
     /// <summary>The shown snapshot; null when the pane shows nothing (error state, before the first navigation).</summary>
     public EntrySnapshot? Current { get; private set; }
 
@@ -66,6 +72,7 @@ public sealed class PaneItemsSource : IList, INotifyCollectionChanged
         Selection.Bind(snapshot, sameFolder);
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         Reset?.Invoke();
+        CurrentChanged?.Invoke();
     }
 
     /// <summary>
@@ -115,6 +122,8 @@ public sealed class PaneItemsSource : IList, INotifyCollectionChanged
             _working = null;
             Current = snapshot;
         }
+
+        CurrentChanged?.Invoke();
     }
 
     /// <summary>Shows nothing (error state). Clears the selection.</summary>
@@ -130,6 +139,7 @@ public sealed class PaneItemsSource : IList, INotifyCollectionChanged
         Selection.Bind(null, sameFolder: false);
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         Reset?.Invoke();
+        CurrentChanged?.Invoke();
     }
 
     /// <summary>

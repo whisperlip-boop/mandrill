@@ -373,7 +373,7 @@ public sealed partial class FileListView : UserControl
         return new DateTime(utcTicks, DateTimeKind.Utc).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
     }
 
-    private static bool IsControlDown()
+    internal static bool IsControlDown()
         => InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 
     // Explorer shows cut items semi-transparent until they are pasted or the clipboard changes.
