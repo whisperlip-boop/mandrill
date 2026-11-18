@@ -142,7 +142,7 @@ public sealed partial class FileListView : UserControl
         get => XamlRoot is not null && IsWithin(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject, this);
     }
 
-    private static bool IsWithin(DependencyObject? element, DependencyObject root)
+    internal static bool IsWithin(DependencyObject? element, DependencyObject root)
     {
         for (var d = element; d is not null; d = VisualTreeHelper.GetParent(d))
         {

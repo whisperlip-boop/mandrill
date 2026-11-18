@@ -522,7 +522,11 @@ public sealed class PaneContextMenus : IDisposable
 
     private void OnDeleteRequested(object? sender, bool permanent)
     {
-        if (sender is PaneView { ViewModel: { CurrentPath: { } folder } vm } pane)
+        if (sender is PaneView { FolderTree.DeleteTarget: { } node } treePane)
+        {
+            _ = RunSafeAsync(DeleteOnceAsync(treePane, node, permanent), "Del");
+        }
+        else if (sender is PaneView { ViewModel: { CurrentPath: { } folder } vm } pane)
         {
             var names = vm.Items.Selection.SelectedEntries().Select(e => e.Name).ToArray();
             if (names.Length > 0)

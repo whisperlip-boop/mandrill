@@ -249,6 +249,14 @@ public sealed partial class FolderTreeView : UserControl
         _ => null,
     };
 
+    /// <summary>
+    /// What Del deletes from the tree: the selected folder node while focus is in the tree; null for Quick access roots,
+    /// drives, This PC, or focus elsewhere.
+    /// </summary>
+    public ContextMenuTarget? DeleteTarget
+        => XamlRoot is not null && FileListView.IsWithin(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject, TreeControl)
+            && NodeOf(TreeControl.SelectedNode) is { Kind: TreeNodeKind.Folder } node ? TargetOf(node) : null;
+
     // The node under the pointer, else (keyboard) the selected one; its menu opens at the pointer or below the node.
     private void OnContextRequested(UIElement sender, ContextRequestedEventArgs e)
     {

@@ -95,7 +95,7 @@ public sealed partial class PaneView : UserControl
     /// <summary>Ctrl+C / Ctrl+X with items selected, or Ctrl+V, from the focused file list (ui-spec §5, AC-3.13–3.15, 3.23–3.24).</summary>
     public event EventHandler<PaneClipboardAction>? ClipboardRequested;
 
-    /// <summary>Del (false) or Shift+Del (true) with items selected (ui-spec §5, AC-3.8; silent with nothing selected, AC-3.24).</summary>
+    /// <summary>Del (false) or Shift+Del (true) with items selected or a tree folder focused (ui-spec §5, AC-3.8; silent with nothing selected, AC-3.24).</summary>
     public event EventHandler<bool>? DeleteRequested;
 
     /// <summary>
@@ -738,12 +738,15 @@ public sealed partial class PaneView : UserControl
         }
     }
 
-    /// <summary>Del / Shift+Del: raises <see cref="DeleteRequested"/> when items are selected and no rename is open.</summary>
+    /// <summary>
+    /// Del / Shift+Del: raises <see cref="DeleteRequested"/> when items are selected and no rename is open, or when the
+    /// focused tree has a deletable folder selected (<see cref="FolderTreeView.DeleteTarget"/>).
+    /// </summary>
     /// <param name="permanent">Shift+Del: delete without the Recycle Bin (after the shell's confirmation).</param>
     public void RequestDelete(bool permanent)
     {
-        // Reviewer B1: only the focused file list's selection; with focus in the tree or a toolbar, Del is not ours.
-        if (_vm is { Items.Selection.Count: > 0 } && !Files.IsRenaming && Files.HasFocusWithin)
+        // Reviewer B1: only the focused file list's selection or the focused tree's folder; with focus in a toolbar, Del is not ours.
+        if ((_vm is { Items.Selection.Count: > 0 } && !Files.IsRenaming && Files.HasFocusWithin) || _tree?.DeleteTarget is not null)
         {
             DeleteRequested?.Invoke(this, permanent);
         }
