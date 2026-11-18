@@ -743,7 +743,11 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         // Another folder starts unfiltered (ui-spec §2b): scanned without the filter, which is cleared only when it commits,
         // so the folder still shown keeps its filter visible meanwhile, also when this navigation fails or is superseded.
         bool clearsFilter = origin is not (NavOrigin.Tab or NavOrigin.Refresh) && !PathUtil.PathEquals(path, CurrentPath);
-        var request = new Request(RequestKind.Navigate, origin, path, statusOnCommit) { KeepOnFailure = keepOnFailure, ClearsFilter = clearsFilter };
+        var request = new Request(RequestKind.Navigate, origin, path, statusOnCommit)
+        {
+            KeepOnFailure = keepOnFailure,
+            FilterAtStart = clearsFilter ? FilterText : null,
+        };
         _request = request;
         _dirtyWhileLoading = false;
         _resortWhenDone = false;
@@ -970,7 +974,8 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
     private void Commit(Request request, string path, string? redirectedFrom)
     {
         request.Committed = true;
-        if (request.ClearsFilter)
+        // Only the old folder's filter goes: text typed while this folder loaded is kept, and the pending re-sort applies it.
+        if (request.FilterAtStart is { } start && string.Equals(FilterText, start, StringComparison.Ordinal))
         {
             SetFilterSilently(string.Empty, open: false); // the scan already ran without it
         }
@@ -1245,8 +1250,9 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
 
         public bool Final { get; set; }
 
-        // A navigation to another folder: scanned unfiltered, clears the filter when it commits (ui-spec §2b).
-        public bool ClearsFilter { get; init; }
+        // A navigation to another folder (ui-spec §2b): the filter text when it started, cleared at commit if still the
+        // same; null for the same folder, a refresh or a tab.
+        public string? FilterAtStart { get; init; }
 
         public TaskCompletionSource<NavigationResult> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
