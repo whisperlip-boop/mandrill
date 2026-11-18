@@ -10,6 +10,9 @@ namespace Mandrill.Presentation.Panes;
 // its history and view state in and runs one navigation (NavOrigin.Tab); the request-id supersession drops the old one.
 public sealed partial class PaneViewModel
 {
+    // Closed tabs, most recent last, with their strip index (Ctrl+Shift+T); memory only, never saved.
+    private readonly List<(int Index, TabState State)> _closedTabs = [];
+
     /// <summary>Tabs in strip order; never empty, at most <see cref="PaneState.MaxTabs"/>.</summary>
     public ObservableCollection<PaneTab> Tabs { get; } = [];
 
@@ -94,6 +97,14 @@ public sealed partial class PaneViewModel
             return;
         }
 
+        _closedTabs.Add((index, tab == ActiveTab
+            ? new TabState(ShownLocation, ViewMode, new SortState(SortColumn, SortDescending), tab.Color)
+            : tab.ToState()));
+        if (_closedTabs.Count > PaneState.MaxTabs)
+        {
+            _closedTabs.RemoveAt(0);
+        }
+
         // Activate first: observers of the list change must never see an active tab outside Tabs (review m1).
         if (tab == ActiveTab)
         {
@@ -102,6 +113,33 @@ public sealed partial class PaneViewModel
 
         Tabs.RemoveAt(index);
         NotifyTabs();
+    }
+
+    /// <summary>
+    /// Reopens the most recently closed tab (<see cref="CloseTab"/>) with its location, view mode, sort and colour, at its
+    /// old index when still valid, else at the end; a colour taken meanwhile becomes the lowest free one.
+    /// </summary>
+    /// <returns>The navigation outcome; Failed without a change when nothing was closed or <see cref="CanAddTab"/> is false.</returns>
+    public Task<NavigationResult> ReopenClosedTabAsync()
+    {
+        if (!CanAddTab || _closedTabs.Count == 0)
+        {
+            return Failed();
+        }
+
+        var (index, state) = _closedTabs[^1];
+        _closedTabs.RemoveAt(_closedTabs.Count - 1);
+        int? color = Tabs.Any(t => t.Color == state.Color) ? null : state.Color;
+        return InsertTab(Math.Min(index, Tabs.Count), state.Path, state.ViewMode, state.Sort, color);
+    }
+
+    /// <summary>Shows the next (or previous) tab, wrapping around (Ctrl+Tab / Ctrl+Shift+Tab).</summary>
+    /// <param name="forward">True for the next tab, false for the previous one.</param>
+    /// <returns>The navigation outcome; completed Committed at once with a single tab.</returns>
+    public Task<NavigationResult> ActivateNextTabAsync(bool forward)
+    {
+        int index = Tabs.IndexOf(ActiveTab) + (forward ? 1 : -1);
+        return ActivateTabAsync(Tabs[(index + Tabs.Count) % Tabs.Count]);
     }
 
     /// <summary>Closes every tab but <paramref name="keep"/>, which becomes the active tab.</summary>
@@ -150,10 +188,10 @@ public sealed partial class PaneViewModel
 
     private static Task<NavigationResult> Failed() => Task.FromResult(new NavigationResult(NavigationOutcome.Failed));
 
-    private Task<NavigationResult> InsertTab(int index, string location, ViewMode viewMode, SortState sort)
+    private Task<NavigationResult> InsertTab(int index, string location, ViewMode viewMode, SortState sort, int? color = null)
     {
-        int color = Enumerable.Range(0, PaneState.MaxTabs).First(c => Tabs.All(t => t.Color != c));
-        var tab = new PaneTab(color, location, viewMode, sort);
+        color ??= Enumerable.Range(0, PaneState.MaxTabs).First(c => Tabs.All(t => t.Color != c));
+        var tab = new PaneTab(color.Value, location, viewMode, sort);
         Tabs.Insert(index, tab);
         NotifyTabs();
         return ActivateTabAsync(tab);
@@ -163,6 +201,7 @@ public sealed partial class PaneViewModel
     private void ResetTabs(PaneState state)
     {
         Tabs.Clear();
+        _closedTabs.Clear(); // they belong to the replaced strip
         foreach (TabState tab in state.Tabs!)
         {
             Tabs.Add(new PaneTab(tab.Color, tab.Path, tab.ViewMode, tab.Sort));

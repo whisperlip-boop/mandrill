@@ -659,11 +659,16 @@ public sealed partial class PaneTabStrip : UserControl
 
     private void OnTabPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        var item = (PaneTabItem)sender;
+        var properties = e.GetCurrentPoint(this).Properties;
+        if (properties.IsLeftButtonPressed)
         {
-            var item = (PaneTabItem)sender;
             PressTab(item, e.GetCurrentPoint(RowCanvas).Position.X, e.Pointer.PointerId);
             item.CapturePointer(e.Pointer);
+        }
+        else if (properties.PointerUpdateKind == Microsoft.UI.Input.PointerUpdateKind.MiddleButtonPressed && _press is null)
+        {
+            Close(item); // as the x button: the last tab stays
         }
     }
 

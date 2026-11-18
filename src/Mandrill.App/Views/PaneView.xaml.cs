@@ -811,6 +811,23 @@ public sealed partial class PaneView : UserControl
         AddListKey(VirtualKey.C, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () => RequestClipboard(PaneClipboardAction.CopyAsPath));
         AddListKey(VirtualKey.Enter, VirtualKeyModifiers.Menu, RequestProperties);
         Add(VirtualKey.Delete, VirtualKeyModifiers.Shift, () => RequestDelete(permanent: true), inTextFields: false);
+
+        // Tabs (ui-spec §2a): opening and closing stay silent while typing (a rename or the path box keeps its text).
+        // Switching also works in the path and filter boxes, but not during a rename: the folder change would drop it, and
+        // committing first is unsafe while the extension question is open.
+        Add(VirtualKey.T, VirtualKeyModifiers.Control, () => _ = _vm!.NewTabAsync(), inTextFields: false);
+        Add(VirtualKey.W, VirtualKeyModifiers.Control, () => _vm!.CloseTab(_vm.ActiveTab), inTextFields: false);
+        Add(VirtualKey.T, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () => _ = _vm!.ReopenClosedTabAsync(), inTextFields: false);
+        Add(VirtualKey.Tab, VirtualKeyModifiers.Control, () => SwitchTab(forward: true), inTextFields: true);
+        Add(VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () => SwitchTab(forward: false), inTextFields: true);
+    }
+
+    private void SwitchTab(bool forward)
+    {
+        if (!Files.IsRenaming)
+        {
+            _ = _vm!.ActivateNextTabAsync(forward);
+        }
     }
 
     // QA m5: Ctrl+C/X/V (and Ctrl+Shift+C, Alt+Enter) belong to the focused list; with focus elsewhere in the pane the key
