@@ -35,6 +35,7 @@ public sealed partial class FolderTreeView : UserControl
     private readonly DispatcherQueueTimer _keyboardTimer;
     private bool _syncingSelection;
     private TreeNode? _keyboardTarget;
+    private bool _repeatedDelete;
 
     // Realized node icons by the key they wait for: their own key and, for per-path icons, a placeholder key.
     private readonly Dictionary<IconKey, HashSet<TreeNodeIcon>> _iconWaiters = [];
@@ -53,6 +54,7 @@ public sealed partial class FolderTreeView : UserControl
         TreeControl.ItemInvoked += OnItemInvoked;
         TreeControl.SelectionChanged += OnSelectionChanged;
         TreeControl.ContextRequested += OnContextRequested;
+        TreeControl.PreviewKeyDown += (_, e) => _repeatedDelete = e.Key == Windows.System.VirtualKey.Delete && e.KeyStatus.WasKeyDown; // before the pane's Del accelerator
 
         // UIA exposes the template's TreeViewList as the tree, not the TreeView that carries the name (QA s2).
         TreeControl.Loaded += (_, _) =>
@@ -250,12 +252,15 @@ public sealed partial class FolderTreeView : UserControl
     };
 
     /// <summary>
-    /// What Del deletes from the tree: the selected folder node while focus is in the tree; null for Quick access roots,
-    /// drives, This PC, or focus elsewhere.
+    /// What Del deletes from the tree: the folder node that has the keyboard focus and is selected; null for Quick access
+    /// roots, drives, This PC, focus elsewhere, or a held (auto-repeated) Del.
     /// </summary>
+    // QA M1: after a delete the pane falls back to the parent and selects it in code (the focus follows when it is realized),
+    // so a held Del would walk up the parents: a repeated Del never deletes, and a focus apart from the selection is a no-op.
     public ContextMenuTarget? DeleteTarget
-        => XamlRoot is not null && FileListView.IsWithin(FocusManager.GetFocusedElement(XamlRoot) as DependencyObject, TreeControl)
-            && NodeOf(TreeControl.SelectedNode) is { Kind: TreeNodeKind.Folder } node ? TargetOf(node) : null;
+        => !_repeatedDelete && XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is TreeViewItem item
+            && TreeControl.NodeFromContainer(item) is { } focused && ReferenceEquals(focused, TreeControl.SelectedNode)
+            && NodeOf(focused) is { Kind: TreeNodeKind.Folder } node ? TargetOf(node) : null;
 
     // The node under the pointer, else (keyboard) the selected one; its menu opens at the pointer or below the node.
     private void OnContextRequested(UIElement sender, ContextRequestedEventArgs e)
