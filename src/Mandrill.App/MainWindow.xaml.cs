@@ -60,6 +60,9 @@ public sealed partial class MainWindow : Window
         Title = Localizer.Current["app.title"];
         AppWindow.SetIcon(paths.AppIcon);
         SettingsItem.Icon = _icons.CreateElement(IconId.Settings);
+        LanguageItem.Icon = _icons.CreateElement(IconId.Language);
+        ShortcutsItem.Icon = _icons.CreateElement(IconId.Shortcuts);
+        ExportItem.Icon = _icons.CreateElement(IconId.Export);
         AddPaneItem.Icon = _icons.CreateElement(IconId.AddPane);
         RemovePaneItem.Icon = _icons.CreateElement(IconId.RemovePane);
         SetupTopBar();

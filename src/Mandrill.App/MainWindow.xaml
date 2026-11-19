@@ -65,8 +65,12 @@
                     x:Name="SettingsItem"
                     Command="{x:Bind ViewModel.OpenSettingsCommand}"
                     Text="{m:Tr Key=menu.file.settings}" />
-                <MenuFlyoutItem Command="{x:Bind ViewModel.OpenLanguageCommand}" Text="{m:Tr Key=menu.file.language}" />
                 <MenuFlyoutItem
+                    x:Name="LanguageItem"
+                    Command="{x:Bind ViewModel.OpenLanguageCommand}"
+                    Text="{m:Tr Key=menu.file.language}" />
+                <MenuFlyoutItem
+                    x:Name="ShortcutsItem"
                     Command="{x:Bind ViewModel.OpenShortcutsCommand}"
                     KeyboardAcceleratorTextOverride="F1"
                     Text="{m:Tr Key=menu.file.shortcuts}" />

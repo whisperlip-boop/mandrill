@@ -50,6 +50,15 @@ public enum IconId
     /// <summary>Settings.</summary>
     Settings,
 
+    /// <summary>Language.</summary>
+    Language,
+
+    /// <summary>Keyboard shortcuts.</summary>
+    Shortcuts,
+
+    /// <summary>Export file list.</summary>
+    Export,
+
     /// <summary>Tree toggle while the tree is shown (owner F20: the icon reflects the state).</summary>
     TreeShown,
 
@@ -143,6 +152,9 @@ public sealed class IconProvider(ILogger? logger = null)
         IconId.RemovePane => "minus_window",
         IconId.ViewMode => "viewmode",
         IconId.Settings => "settings",
+        IconId.Language => "language",
+        IconId.Shortcuts => "shortcut",
+        IconId.Export => "export-file",
         IconId.TreeShown => "tree-view",
         IconId.TreeHidden => "no_tree_view",
         // Owner glyph files are not in picker order (architecture §10); w2.svg draws left | right, w3.svg top / bottom (owner round 6 #2).
