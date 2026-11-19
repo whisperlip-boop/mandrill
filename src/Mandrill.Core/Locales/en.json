@@ -108,6 +108,7 @@
   "pane.filter.count": "{shown} / {total}",
   "pane.filter.close": "Close filter (Esc)",
   "pane.filter.clear": "Clear filter (Esc)",
+  "pane.filter.noMatch": "No items match the filter.",
   "pane.view.details": "Details",
   "pane.view.list": "List",
   "pane.view.extraLargeIcons": "Extra large icons",

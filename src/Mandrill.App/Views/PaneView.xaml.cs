@@ -612,6 +612,16 @@ public sealed partial class PaneView : UserControl
         };
         FilterCloseButton.Content = Icon(IconId.Close);
         FilterCloseButton.Click += (_, _) => DismissFilter();
+        FilterBox.Loaded += (_, _) =>
+        {
+            // FilterCloseButton is the row's only X: cap the box's own clear button as BeginRename does for the rename box.
+            FilterBox.ApplyTemplate();
+            if (FileListView.Descendant<Button>(FilterBox, b => b.Name == "DeleteButton") is { } clear)
+            {
+                clear.MinWidth = 0;
+                clear.MaxWidth = 0;
+            }
+        };
         FilterBox.TextChanged += (_, _) =>
         {
             if (vm.FilterText != FilterBox.Text)
@@ -662,9 +672,12 @@ public sealed partial class PaneView : UserControl
 
         bool available = !_vm.IsThisPc;
         bool shown = _filterAlways || (available && _vm.IsFilterOpen);
-        if (!shown && IsFocusIn(FilterRow))
+        // Collapsing or disabling (This PC under "Always show") the focused box would move the focus to the next pane (QA F1).
+        // Park it on this pane's tab first: a just-shown drive list refuses the focus until laid out (it retries then).
+        if ((!shown || !available) && IsFocusIn(FilterRow))
         {
-            FocusList(); // collapsing the focused box would move the focus to the next pane (QA F1)
+            TabRow.HoldFocus();
+            FocusList();
         }
 
         FilterRow.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;

@@ -202,6 +202,7 @@ public sealed partial class FileListView : UserControl
             UpdateMessage();
             HandFocusToARow(); // after the adapter (subscribed first) has passed the change to the control
         };
+        vm.Items.CurrentChanged += UpdateMessage; // a snapshot that changes only the total switches empty / no match
         vm.SelectionRequested += OnSelectionRequested;
         _iconsReadyHandler = keys => _dispatcher.Post(() => OnIconsReady(keys), UiPriority.Low);
         _typeNamesHandler = () => _dispatcher.Post(RefreshTypeCells, UiPriority.Low);
@@ -1104,9 +1105,9 @@ public sealed partial class FileListView : UserControl
             RetryLink.Visibility = Visibility.Visible;
             MessagePanel.Visibility = Visibility.Visible;
         }
-        else if (!_vm.IsLoading && _vm.Items.Current is not null && _vm.Items.Count == 0)
+        else if (!_vm.IsLoading && _vm.Items.Current is { } shown && _vm.Items.Count == 0)
         {
-            MessageText.Text = Localizer.Current["pane.empty"];
+            MessageText.Text = Localizer.Current[shown.Total > 0 ? "pane.filter.noMatch" : "pane.empty"]; // Total: before the name filter
             RetryLink.Visibility = Visibility.Collapsed;
             MessagePanel.Visibility = Visibility.Visible;
         }
