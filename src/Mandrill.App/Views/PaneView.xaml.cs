@@ -610,7 +610,7 @@ public sealed partial class PaneView : UserControl
 
             ApplyFilter(); // a ToggleButton flips itself; the row decides
         };
-        FilterCloseButton.Content = Icon(IconId.Close);
+        FilterCloseButton.Content = _icons!.CreateElement(IconId.Close, size: 12); // fills the 24 px button's Padding-6 content box, centred
         FilterCloseButton.Click += (_, _) => DismissFilter();
         FilterBox.Loaded += (_, _) =>
         {

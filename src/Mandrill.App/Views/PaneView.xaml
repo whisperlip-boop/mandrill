@@ -174,7 +174,7 @@
                 <TextBox
                     x:Name="FilterBox"
                     MinHeight="0"
-                    Padding="8,2,8,2"
+                    Padding="8,0,8,0"
                     VerticalContentAlignment="Center"
                     AutomationProperties.Name="{m:Tr Key=pane.filter.box}"
                     PlaceholderText="{m:Tr Key=pane.filter.box}" />
