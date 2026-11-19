@@ -108,6 +108,7 @@
   "pane.filter.count": "{shown} / {total}",
   "pane.filter.close": "필터 닫기 (Esc)",
   "pane.filter.clear": "필터 지우기 (Esc)",
+  "pane.filter.noMatch": "필터와 일치하는 항목이 없습니다.",
   "pane.view.details": "자세히",
   "pane.view.list": "목록",
   "pane.view.extraLargeIcons": "아주 큰 아이콘",

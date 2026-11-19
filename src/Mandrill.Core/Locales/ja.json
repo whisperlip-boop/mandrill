@@ -108,6 +108,7 @@
   "pane.filter.count": "{shown} / {total}",
   "pane.filter.close": "フィルターを閉じる (Esc)",
   "pane.filter.clear": "フィルターをクリア (Esc)",
+  "pane.filter.noMatch": "フィルターに一致する項目はありません。",
   "pane.view.details": "詳細",
   "pane.view.list": "一覧",
   "pane.view.extraLargeIcons": "特大アイコン",

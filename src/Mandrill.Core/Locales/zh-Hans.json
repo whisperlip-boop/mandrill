@@ -108,6 +108,7 @@
   "pane.filter.count": "{shown} / {total}",
   "pane.filter.close": "关闭筛选 (Esc)",
   "pane.filter.clear": "清除筛选 (Esc)",
+  "pane.filter.noMatch": "没有与筛选条件匹配的项目。",
   "pane.view.details": "详细信息",
   "pane.view.list": "列表",
   "pane.view.extraLargeIcons": "超大图标",
