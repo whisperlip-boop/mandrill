@@ -16,6 +16,8 @@ favorite, and find files by name across your local drives from Mandrill's own in
 - **Several windows**: open another Mandrill window with **File → New window** (Ctrl+N). Settings and favorites stay in
   sync between windows.
 - **Views**: Icons (several sizes), List and Details with sortable columns. Hidden files on request.
+  Rubber band selection in every view: drag from an empty area, or from a row away from an item's icon and name.
+  Shift adds to the selection, Ctrl toggles, Esc cancels and restores it, and the list scrolls at its edge.
 - **Favorites**: save the current layout and every pane's folder as a named favorite and restore it with one click.
   Mandrill also reopens as you left it.
 - **Index search**: local fixed drives are indexed in the background and kept up to date. Each pane has a search
