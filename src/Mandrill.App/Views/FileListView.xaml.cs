@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -29,7 +30,7 @@ namespace Mandrill.App.Views;
 /// <summary>
 /// The file list of one pane (architecture §5, ui-spec §2): Details/Icons/List over one <see cref="PaneListAdapter"/>,
 /// rows filled in ContainerContentChanging, icons and type names refreshed only on realized containers, type-ahead,
-/// rubber band (Icons/List), Ctrl+wheel view mode and icon size, slow-click rename, Details header with sort and resizable columns.
+/// rubber band, Ctrl+wheel view mode and icon size, slow-click rename, Details header with sort and resizable columns.
 /// </summary>
 public sealed partial class FileListView : UserControl
 {
@@ -40,6 +41,7 @@ public sealed partial class FileListView : UserControl
     private const double NameMinWidth = 120;
     private const double ColumnMinWidth = 40;
     private const double ListRowHeight = 22;
+    private const double DetailsRowHeight = 24; // DetailsItemStyle Height
     private const double ListMaxWidth = 240;
     private const double AutoScrollEdge = 24;
     private const double AutoScrollStep = 24;
@@ -94,12 +96,17 @@ public sealed partial class FileListView : UserControl
     // Folder shown before a Reset: a different folder scrolls to the top (same-folder refreshes keep the native anchor).
     private string? _resetFrom;
 
-    // Rubber band (Icons/List): start in panel coordinates, so scrolling while dragging keeps the anchor.
+    // Rubber band: pressed off an item's icon and name, drawn past the drag threshold. Start in panel coordinates, so
+    // scrolling while dragging keeps the anchor; the selection at the press is what Ctrl/Shift and Escape refer to.
+    private bool _bandPressed;
     private bool _banding;
-    private bool _bandAdditive;
+    private VirtualKeyModifiers _bandModifiers;
+    private SelectorItem? _bandRow;
     private Point _bandStart;
+    private Point _bandPressInList;
     private Point _bandLastInList;
     private IReadOnlyList<(int First, int Count)> _bandRanges = [];
+    private readonly IndexRangeSet _bandInitial = new();
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _bandTimer;
 
     // Details column widths in effect (stored widths, clamped to the minimums); refreshed on Columns changes.
@@ -197,8 +204,14 @@ public sealed partial class FileListView : UserControl
         vm.PropertyChanged += OnViewModelChanged;
         vm.Items.Resetting += () => _resetFrom = vm.Items.Current?.Path;
         vm.Items.Reset += OnItemsReset;
-        vm.Items.CollectionChanged += (_, _) =>
+        vm.Items.CollectionChanged += (_, e) =>
         {
+            if (_bandPressed && e.Action != NotifyCollectionChangedAction.Replace) // a Replace (file written) keeps every index
+            {
+                EndBand(restore: false); // the indexes under the band moved; keep what it selected
+                _list?.ReleasePointerCaptures();
+            }
+
             UpdateMessage();
             HandFocusToARow(); // after the adapter (subscribed first) has passed the change to the control
         };
@@ -397,6 +410,7 @@ public sealed partial class FileListView : UserControl
     {
         CloseRename(focusList: false);
         CancelSlowClick();
+        EndBand(restore: false); // before the old list goes: its capture loss must not restore into a list without items
         if (_list is not null)
         {
             _list.ContainerContentChanging -= OnContainerContentChanging;
@@ -468,17 +482,21 @@ public sealed partial class FileListView : UserControl
         list.AddHandler(PointerPressedEvent, new PointerEventHandler((_, e) => e.Handled |= FocusFromEmptyPress(e.OriginalSource as DependencyObject)), handledEventsToo: true);
         list.GettingFocus += (_, e) => _focusEnteredByPointer |= e.InputDevice is FocusInputDeviceKind.Mouse or FocusInputDeviceKind.Pen or FocusInputDeviceKind.Touch
             && !IsWithin(e.OldFocusedElement, list);
-        if (mode != ViewMode.Details)
+        list.AddHandler(PointerPressedEvent, new PointerEventHandler(OnBandPressed), handledEventsToo: true);
+        list.AddHandler(PointerMovedEvent, new PointerEventHandler(OnBandMoved), handledEventsToo: true);
+        list.AddHandler(PointerReleasedEvent, new PointerEventHandler(OnBandReleased), handledEventsToo: true);
+        // Routed: a row losing its own capture (the band taking it over) bubbles here too; only the list's own counts. With
+        // the contact up it is the release itself (the order of the two events is not relied on, as in PaneTabStrip).
+        list.PointerCaptureLost += (_, e) =>
         {
-            list.AddHandler(PointerPressedEvent, new PointerEventHandler(OnBandPressed), handledEventsToo: true);
-            list.AddHandler(PointerMovedEvent, new PointerEventHandler(OnBandMoved), handledEventsToo: true);
-            list.AddHandler(PointerReleasedEvent, new PointerEventHandler(OnBandReleased), handledEventsToo: true);
-            list.PointerCaptureLost += (_, _) => EndBand();
-        }
+            if (ReferenceEquals(e.OriginalSource, list))
+            {
+                EndBand(restore: e.GetCurrentPoint(list).IsInContact);
+            }
+        };
 
         HeaderClip.Visibility = mode == ViewMode.Details ? Visibility.Visible : Visibility.Collapsed;
         _headerShift.X = 0;
-        EndBand();
         _list = list;
         list.ItemsSource = _adapter;
         ListHost.Children.Add(list);
@@ -1286,6 +1304,11 @@ public sealed partial class FileListView : UserControl
                 e.Handled = true;
                 BeginRename(RenameTarget());
                 break;
+            case VirtualKey.Escape when _bandPressed:
+                e.Handled = true;
+                EndBand(restore: true);
+                _list?.ReleasePointerCaptures();
+                break;
             case VirtualKey.Back:
                 // Explorer: Backspace = Back, but not while a type-ahead prefix is being typed (ui-spec §5).
                 e.Handled = true;
@@ -1342,51 +1365,108 @@ public sealed partial class FileListView : UserControl
         _vm.SetView(mode);
     }
 
-    // ---- rubber band (Icons/List) ------------------------------------------------------------------------------
+    // ---- rubber band (all modes) -------------------------------------------------------------------------------
 
     private void OnBandPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (_list?.ItemsPanelRoot is not ItemsWrapGrid panel || _adapter is null || IsRenaming)
+        EndBand(restore: false); // a press whose release never arrived does not linger
+        if (_list is not { } list || list.ItemsPanelRoot is not Panel panel || _adapter is null || IsRenaming)
         {
             return; // with the editor open the press only ends the rename (its commit runs on the focus change)
         }
 
         var point = e.GetCurrentPoint(panel);
         var source = e.OriginalSource as DependencyObject;
-        if (!point.Properties.IsLeftButtonPressed || Ancestor<SelectorItem>(source, _list) is not null || Ancestor<ScrollBar>(source, _list) is not null)
+        var row = Ancestor<SelectorItem>(source, list);
+        if (!point.Properties.IsLeftButtonPressed || Ancestor<ScrollBar>(source, list) is not null
+            || (row is not null && (e.Pointer.PointerDeviceType == PointerDeviceType.Touch || IsOnIconOrName(row, e))))
         {
+            return; // an item's icon or name keeps the control's click and drag-out; touch on a row pans
+        }
+
+        _bandPressed = true;
+        _bandRow = row;
+        _bandModifiers = e.KeyModifiers & (VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
+        _bandStart = point.Position;
+        _bandPressInList = _bandLastInList = e.GetCurrentPoint(list).Position;
+        _bandInitial.Clear();
+        foreach (var range in _adapter.GetSelectedRanges())
+        {
+            _bandInitial.Add(range.FirstIndex, range.LastIndex);
+        }
+
+        if (row is not null)
+        {
+            // A click still selects the row (the control's own, on release); past the threshold it is a band, not a drag-out.
+            list.CanDragItems = false;
             return;
         }
 
-        _banding = true;
-        _bandAdditive = e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control);
-        _bandStart = point.Position;
-        _bandLastInList = e.GetCurrentPoint(_list).Position;
-        _bandRanges = [];
-        StartBandTimer();
-        if (!_bandAdditive && _adapter.Count > 0)
+        if (_bandModifiers == VirtualKeyModifiers.None && _adapter.Count > 0)
         {
-            _list.DeselectRange(new ItemIndexRange(0, (uint)_adapter.Count)); // a click on empty space clears (Explorer)
+            list.DeselectRange(new ItemIndexRange(0, (uint)_adapter.Count)); // a click on empty space clears (Explorer)
         }
 
-        _list.CapturePointer(e.Pointer); // the focus: FocusFromEmptyPress, which runs first
+        list.CapturePointer(e.Pointer); // the focus: FocusFromEmptyPress, which runs first
         e.Handled = true;
+    }
+
+    // Explorer drags files only from an item's icon or name text; the rest of a row or cell starts a band.
+    private bool IsOnIconOrName(SelectorItem row, PointerRoutedEventArgs e)
+    {
+        if (row.ContentTemplateRoot is not Grid root)
+        {
+            return true;
+        }
+
+        var parts = RowParts.Of(root, _mode);
+        var inBox = e.GetCurrentPoint(parts.IconBox).Position;
+        if (inBox.X >= 0 && inBox.Y >= 0 && inBox.X < parts.IconBox.ActualWidth && inBox.Y < parts.IconBox.ActualHeight)
+        {
+            return true;
+        }
+
+        // A Details or List name fills its column; only the text itself counts.
+        _measure.Text = parts.Name.Text;
+        _measure.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var inName = e.GetCurrentPoint(parts.Name).Position;
+        return inName.X >= 0 && inName.Y >= 0 && inName.X < Math.Min(parts.Name.ActualWidth, _measure.DesiredSize.Width) && inName.Y < parts.Name.ActualHeight;
     }
 
     private void OnBandMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (!_banding || _list?.ItemsPanelRoot is not ItemsWrapGrid panel || _adapter is null)
+        if (!_bandPressed || _list?.ItemsPanelRoot is not Panel panel || _adapter is null)
         {
             return;
         }
 
         _bandLastInList = e.GetCurrentPoint(_list).Position;
+        if (!_banding)
+        {
+            if (Math.Abs(_bandLastInList.X - _bandPressInList.X) < PaneTabStrip.DragThreshold
+                && Math.Abs(_bandLastInList.Y - _bandPressInList.Y) < PaneTabStrip.DragThreshold)
+            {
+                return;
+            }
+
+            _banding = true;
+            CancelSlowClick();
+            _bandRow?.ReleasePointerCaptures(); // its press must not end as a click on the row
+            _list.CapturePointer(e.Pointer);
+            if (_bandModifiers == VirtualKeyModifiers.None && _adapter.Count > 0)
+            {
+                _list.DeselectRange(new ItemIndexRange(0, (uint)_adapter.Count));
+            }
+
+            StartBandTimer();
+        }
+
         UpdateBand(panel, e.GetCurrentPoint(panel).Position);
         e.Handled = true;
     }
 
-    // Draws the band and selects what it covers; selection work only when the covered ranges changed.
-    private void UpdateBand(ItemsWrapGrid panel, Point current)
+    // Draws the band and selects what it covers; selection work only for the indexes whose coverage changed.
+    private void UpdateBand(Panel panel, Point current)
     {
         if (_list is null || _adapter is null)
         {
@@ -1395,23 +1475,36 @@ public sealed partial class FileListView : UserControl
 
         var band = new Rect(_bandStart, current);
         DrawBand(panel, band);
-        var ranges = ListGeometry.HitRanges(band, new Size(panel.ItemWidth, panel.ItemHeight), new Size(panel.ActualWidth, panel.ActualHeight), _adapter.Count, _mode == ViewMode.Icons);
+
+        // Details rows span the panel, one per line; Icons and List cells are the wrap grid's.
+        var (cell, extent) = panel is ItemsWrapGrid grid
+            ? (new Size(grid.ItemWidth, grid.ItemHeight), new Size(grid.ActualWidth, grid.ActualHeight))
+            : (new Size(panel.ActualWidth, DetailsRowPitch(panel)), new Size(panel.ActualWidth, panel.ActualHeight));
+        var ranges = ListGeometry.HitRanges(band, cell, extent, _adapter.Count, _mode != ViewMode.List);
         if (ranges.SequenceEqual(_bandRanges))
         {
             return;
         }
 
-        _bandRanges = ranges;
-        if (!_bandAdditive)
+        foreach (var (first, count, select) in ListGeometry.BandChanges(_bandRanges, ranges, _bandInitial, _bandModifiers))
         {
-            _list.DeselectRange(new ItemIndexRange(0, (uint)_adapter.Count));
+            var range = new ItemIndexRange(first, (uint)count);
+            if (select)
+            {
+                _list.SelectRange(range);
+            }
+            else
+            {
+                _list.DeselectRange(range);
+            }
         }
 
-        foreach (var (first, count) in ranges)
-        {
-            _list.SelectRange(new ItemIndexRange(first, (uint)count));
-        }
+        _bandRanges = ranges;
     }
+
+    // A realized row's height: layout rounding at a fractional display scale makes it differ from the style's 24.
+    private static double DetailsRowPitch(Panel panel)
+        => panel.Children.Count > 0 && panel.Children[0] is FrameworkElement { ActualHeight: > 0 } row ? row.ActualHeight : DetailsRowHeight;
 
     // Explorer keeps scrolling while the pointer rests at an edge; PointerMoved alone would stop.
     private void StartBandTimer()
@@ -1427,7 +1520,7 @@ public sealed partial class FileListView : UserControl
         timer.IsRepeating = true;
         timer.Tick += (_, _) =>
         {
-            if (!_banding || _list?.ItemsPanelRoot is not ItemsWrapGrid panel || !AutoScroll(_bandLastInList))
+            if (!_banding || _list?.ItemsPanelRoot is not Panel panel || !AutoScroll(_bandLastInList))
             {
                 return;
             }
@@ -1441,20 +1534,44 @@ public sealed partial class FileListView : UserControl
 
     private void OnBandReleased(object sender, PointerRoutedEventArgs e)
     {
-        if (_banding)
+        if (!_bandPressed)
+        {
+            return;
+        }
+
+        bool listCaptured = _banding || _bandRow is null; // a row press below the threshold stays the row's click
+        EndBand(restore: false);
+        if (listCaptured)
         {
             _list?.ReleasePointerCapture(e.Pointer);
-            EndBand();
             e.Handled = true;
         }
     }
 
-    private void EndBand()
+    // Escape, a lost capture or a list change while pressed. restore: back to the selection at the press (Explorer's cancel).
+    private void EndBand(bool restore)
     {
+        bool changed = _bandPressed && (_banding || _bandRow is null);
+        _bandPressed = false;
         _banding = false;
+        _bandRow = null;
         _bandTimer?.Stop();
         _bandRanges = [];
         Band.Visibility = Visibility.Collapsed;
+        if (_list is null)
+        {
+            return;
+        }
+
+        _list.CanDragItems = true;
+        if (restore && changed && _adapter is { Count: > 0 } adapter)
+        {
+            _list.DeselectRange(new ItemIndexRange(0, (uint)adapter.Count));
+            foreach (var (first, last) in _bandInitial.Ranges)
+            {
+                _list.SelectRange(new ItemIndexRange(first, (uint)(last - first + 1)));
+            }
+        }
     }
 
     private void DrawBand(UIElement panel, Rect band)
@@ -1479,7 +1596,7 @@ public sealed partial class FileListView : UserControl
             return false;
         }
 
-        if (_mode == ViewMode.Icons)
+        if (_mode != ViewMode.List)
         {
             double dy = inList.Y < AutoScrollEdge ? -AutoScrollStep : inList.Y > _list.ActualHeight - AutoScrollEdge ? AutoScrollStep : 0;
             double target = Math.Clamp(_scroller.VerticalOffset + dy, 0, _scroller.ScrollableHeight);

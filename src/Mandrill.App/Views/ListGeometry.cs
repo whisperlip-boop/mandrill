@@ -1,5 +1,6 @@
 using Mandrill.Core.State;
 using Windows.Foundation;
+using Windows.System;
 
 namespace Mandrill.App.Views;
 
@@ -81,7 +82,7 @@ public static class ListGeometry
 
     /// <summary>
     /// Index ranges (first, count) of the cells of a uniform wrap grid that intersect <paramref name="band"/>, one range per
-    /// row (horizontal flow) or per column (vertical flow), in index order.
+    /// row (horizontal flow) or per column (vertical flow), in index order; touching ranges are merged.
     /// </summary>
     /// <param name="band">Selection rectangle in panel coordinates.</param>
     /// <param name="cell">Cell size.</param>
@@ -122,12 +123,122 @@ public static class ListGeometry
         {
             int first = (line * perLine) + firstCell;
             int last = Math.Min(itemCount - 1, (line * perLine) + lastCell);
-            if (first <= last)
+            if (first > last)
+            {
+                continue;
+            }
+
+            // Whole lines touch (Details has one row per line): one range, so a tall band costs one range, not one per row.
+            if (result.Count > 0 && result[^1] is var (prevFirst, prevCount) && prevFirst + prevCount == first)
+            {
+                result[^1] = (prevFirst, prevCount + last - first + 1);
+            }
+            else
             {
                 result.Add((first, last - first + 1));
             }
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// The selection changes when the band's hit ranges go from <paramref name="before"/> to <paramref name="after"/>, as in
+    /// Explorer: no modifier selects exactly the hits, Shift adds them to <paramref name="initial"/>, Ctrl toggles them
+    /// against it (Ctrl wins over Shift). Only indexes in exactly one of the two hit lists are touched, so the work follows
+    /// the band's change, not the item count.
+    /// </summary>
+    /// <param name="before">Previous hit ranges (first, count), sorted and disjoint.</param>
+    /// <param name="after">New hit ranges, sorted and disjoint.</param>
+    /// <param name="initial">The selection when the band started.</param>
+    /// <param name="modifiers">Modifiers held when the band started.</param>
+    /// <returns>Ranges (first, count) to select or deselect, in index order.</returns>
+    public static IReadOnlyList<(int First, int Count, bool Select)> BandChanges(
+        IReadOnlyList<(int First, int Count)> before, IReadOnlyList<(int First, int Count)> after, IndexRangeSet initial, VirtualKeyModifiers modifiers)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(after);
+        ArgumentNullException.ThrowIfNull(initial);
+        bool toggle = modifiers.HasFlag(VirtualKeyModifiers.Control);
+        bool add = !toggle && modifiers.HasFlag(VirtualKeyModifiers.Shift);
+        var result = new List<(int First, int Count, bool Select)>();
+
+        // Between two consecutive range ends, membership in before/after is constant.
+        var ends = new List<int>((before.Count + after.Count) * 2);
+        foreach (var (first, count) in before.Concat(after))
+        {
+            ends.Add(first);
+            ends.Add(first + count);
+        }
+
+        ends.Sort();
+        int b = 0, a = 0;
+        for (int k = 0; k + 1 < ends.Count; k++)
+        {
+            int start = ends[k], end = ends[k + 1];
+            bool inAfter = Covers(after, ref a, start);
+            if (start == end || Covers(before, ref b, start) == inAfter)
+            {
+                continue;
+            }
+
+            // Wanted state of an index that was / was not selected when the band started.
+            bool whenInitial = toggle ? !inAfter : add || inAfter;
+            if (whenInitial == inAfter)
+            {
+                Emit(result, start, end, inAfter);
+                continue;
+            }
+
+            var ranges = initial.Ranges;
+            int lo = 0, hi = ranges.Count;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) >>> 1;
+                (lo, hi) = ranges[mid].Last < start ? (mid + 1, hi) : (lo, mid);
+            }
+
+            int at = start;
+            for (int r = lo; r < ranges.Count && ranges[r].First < end; r++)
+            {
+                int from = Math.Max(at, ranges[r].First), to = Math.Min(end, ranges[r].Last + 1);
+                Emit(result, at, from, inAfter);
+                Emit(result, from, to, whenInitial);
+                at = to;
+            }
+
+            Emit(result, at, end, inAfter);
+        }
+
+        return result;
+    }
+
+    // Whether a sorted, disjoint range list covers index; cursor only moves forward (callers ask in ascending order).
+    private static bool Covers(IReadOnlyList<(int First, int Count)> ranges, ref int cursor, int index)
+    {
+        while (cursor < ranges.Count && ranges[cursor].First + ranges[cursor].Count <= index)
+        {
+            cursor++;
+        }
+
+        return cursor < ranges.Count && ranges[cursor].First <= index;
+    }
+
+    // Appends [start, end) with the state, merged into the previous piece when they touch and agree.
+    private static void Emit(List<(int First, int Count, bool Select)> result, int start, int end, bool select)
+    {
+        if (end <= start)
+        {
+            return;
+        }
+
+        if (result.Count > 0 && result[^1] is var last && last.Select == select && last.First + last.Count == start)
+        {
+            result[^1] = (last.First, last.Count + end - start, select);
+        }
+        else
+        {
+            result.Add((start, end - start, select));
+        }
     }
 }

@@ -79,7 +79,9 @@ public sealed partial class FileListView
     private void OnDragItemsStarting(object sender, DragItemsStartingEventArgs e)
     {
         CancelSlowClick();
-        if (_vm?.CurrentPath is not { } folder)
+        // A press off the icon and name is a rubber band: should the control start its drag before CanDragItems = false
+        // took effect, cancel it here.
+        if (_bandPressed || _vm?.CurrentPath is not { } folder)
         {
             e.Cancel = true;
             return;
