@@ -558,7 +558,7 @@ public sealed partial class FileListView : UserControl
 
         if (_mode == ViewMode.Icons)
         {
-            var cell = ListGeometry.IconCell(_vm.IconSize);
+            var cell = ListGeometry.IconCell(_vm.IconSize, ListFontSize);
             grid.ItemWidth = cell.Width;
             grid.ItemHeight = cell.Height;
         }
@@ -1848,7 +1848,8 @@ public sealed partial class FileListView : UserControl
 
         double left = Math.Max(0, bounds.X - 4);
         Canvas.SetLeft(RenameBox, left);
-        Canvas.SetTop(RenameBox, Math.Max(0, bounds.Y + (bounds.Height / 2) - 13));
+        // An Icons label fills its row (up to four lines): the box starts at the name's first line; one-line rows centre it.
+        Canvas.SetTop(RenameBox, Math.Max(0, _mode == ViewMode.Icons ? bounds.Y : bounds.Y + (bounds.Height / 2) - 13));
         RenameBox.MaxWidth = Math.Max(RenameBox.MinWidth, EditCanvas.ActualWidth - left); // then the text scrolls
         return true;
     }

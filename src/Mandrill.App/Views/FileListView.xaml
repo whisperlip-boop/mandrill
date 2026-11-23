@@ -109,7 +109,7 @@
                 </Grid>
             </DataTemplate>
 
-            <!--  Icons cell: icon above a label of at most two lines.  -->
+            <!--  Icons cell: icon above a label of at most four lines, as in Explorer (ListGeometry.IconCell reserves the height).  -->
             <DataTemplate x:Key="IconsCellTemplate">
                 <Grid Padding="4" RowSpacing="4">
                     <Grid.RowDefinitions>
@@ -123,7 +123,7 @@
                     <TextBlock
                         Grid.Row="1"
                         HorizontalAlignment="Center"
-                        MaxLines="2"
+                        MaxLines="4"
                         TextAlignment="Center"
                         TextTrimming="CharacterEllipsis"
                         TextWrapping="Wrap" />

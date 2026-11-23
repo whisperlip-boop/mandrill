@@ -75,10 +75,12 @@ public static class ListGeometry
         return (steps, total - (steps * 120));
     }
 
-    /// <summary>Icons-view cell size for an icon size: room for the icon and a two-line label.</summary>
+    /// <summary>Icons-view cell size for an icon size: room for the icon and a label of up to four lines, as in Explorer.</summary>
     /// <param name="iconSize">Icon size in pixels.</param>
+    /// <param name="fontSize">List font size in pixels (Windows' icon title font).</param>
     /// <returns>Cell width and height.</returns>
-    public static Size IconCell(int iconSize) => new(Math.Max(iconSize + 32, 88), iconSize + 48);
+    public static Size IconCell(int iconSize, double fontSize) =>
+        new(Math.Max(iconSize + 32, 88), iconSize + 16 + (4 * Math.Ceiling(fontSize * 4 / 3))); // 12 px padding + 4 px slack; Segoe UI lines are ~1.33 em
 
     /// <summary>
     /// Index ranges (first, count) of the cells of a uniform wrap grid that intersect <paramref name="band"/>, one range per
