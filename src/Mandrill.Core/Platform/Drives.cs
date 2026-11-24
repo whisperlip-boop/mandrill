@@ -110,7 +110,7 @@ public static class Drives
     /// Total size and free space of a drive (This PC list, ADR-0015): GetDiskFreeSpaceExW, free = what the user may still
     /// write. Worker thread only: it reads the media; a not-ready drive fails fast (no "insert a disk" box, AppBootstrap).
     /// </summary>
-    /// <param name="root">Drive root, e.g. "C:\".</param>
+    /// <param name="root">Drive root, e.g. "C:\", or any folder on the volume (the status bars pass the shown folder).</param>
     /// <returns>Total and free bytes, or null when the drive is not ready or inaccessible.</returns>
     public static (long Total, long Free)? TryGetSpace(string root)
     {

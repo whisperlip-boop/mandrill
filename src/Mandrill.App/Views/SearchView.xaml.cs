@@ -59,6 +59,8 @@ public sealed partial class SearchView : UserControl
     private SelectorItem? _contextRow;
     private double _dragStartWidth;
     private bool _syncingQuery;
+    private bool _selectionPending;
+    private IUiDispatcher? _dispatcher;
 
     /// <summary>Creates the view; call <see cref="Attach"/> before use.</summary>
     public SearchView()
@@ -67,6 +69,7 @@ public sealed partial class SearchView : UserControl
         AppTheme.Track(Resources); // ExplorerItems.xaml scope
         Header.RenderTransform = _headerShift;
         HeaderClip.SizeChanged += (_, e) => HeaderClipRect.Rect = new Rect(0, 0, e.NewSize.Width, e.NewSize.Height);
+        FileListView.ClipToBounds(Results);
         BuildHeader();
         ApplyColumns();
 
@@ -125,6 +128,9 @@ public sealed partial class SearchView : UserControl
     /// <summary>The footer text (tests).</summary>
     public string FooterTextValue => FooterText.Text;
 
+    /// <summary>The selection summary on the right of the footer, "" with no selection (tests).</summary>
+    public string SelectionSummaryValue => SelectionSummary.Text;
+
     /// <summary>The search button's text: "Search" or "Stop" (tests).</summary>
     public string SearchButtonText => SearchButton.Content as string ?? string.Empty;
 
@@ -176,10 +182,38 @@ public sealed partial class SearchView : UserControl
         vm.PropertyChanged += OnViewModelChanged;
         _canSearchChangedHandler = (_, _) => SyncButtons();
         vm.SearchCommand.CanExecuteChanged += _canSearchChangedHandler;
+        _dispatcher = dispatcher;
         _adapter = new SearchListAdapter(vm.Results);
+        _adapter.SelectionChanged += ScheduleSelectionSummary;
+        vm.SelectionStatus.Changed += ScheduleSelectionSummary; // the single item's info tip arrived (WP3)
         Results.ItemsSource = _adapter;
         SyncQuery();
         SyncAll();
+    }
+
+    private void ScheduleSelectionSummary()
+    {
+        if (!_selectionPending && _dispatcher is { } dispatcher)
+        {
+            _selectionPending = true; // a Ctrl+A or Shift range is one update, as the pane's ScheduleCount
+            dispatcher.Post(UpdateSelectionSummary, UiPriority.Low);
+        }
+    }
+
+    private void UpdateSelectionSummary()
+    {
+        _selectionPending = false;
+        if (_vm is not { } vm)
+        {
+            return;
+        }
+
+        int count = _adapter?.SelectedCount ?? 0;
+        string? single = count == 1 && _adapter!.SelectedHits() is [var hit] ? Path.Combine(hit.Directory, hit.Name) : null;
+        vm.SelectionStatus.Update(count, count > 0 ? _adapter!.SelectedBytes() : 0, single, vm.Scope); // the scope's drive (WP4)
+        SelectionSummary.Text = vm.SelectionStatus.Summary;
+        SelectionTip.Text = vm.SelectionStatus.Tip.Length == 0 ? string.Empty : "| " + vm.SelectionStatus.Tip;
+        TipColumn.Width = SelectionTip.Text.Length == 0 ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
     }
 
     /// <summary>Unbinds the list and unsubscribes from the long-lived icon service and the view model (window closed).</summary>
@@ -193,6 +227,7 @@ public sealed partial class SearchView : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnViewModelChanged;
+            _vm.SelectionStatus.Changed -= ScheduleSelectionSummary;
             if (_canSearchChangedHandler is not null)
             {
                 _vm.SearchCommand.CanExecuteChanged -= _canSearchChangedHandler;

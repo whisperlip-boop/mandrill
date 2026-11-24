@@ -185,3 +185,6 @@ FILE_RENAME_FLAG_POSIX_SEMANTICS
 FILE_RENAME_FLAG_REPLACE_IF_EXISTS
 // Window cascade for a second instance (§18 D5): the window's DPI before it is shown
 GetDpiForWindow
+// Shell info tip of a single selection in the status bars (owner WP3, Explorer parity)
+IQueryInfo
+BHID_SFUIObject

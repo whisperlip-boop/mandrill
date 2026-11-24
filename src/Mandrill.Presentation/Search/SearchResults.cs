@@ -198,6 +198,27 @@ public sealed class SearchResults : IList, IReadOnlyList<SearchHit>, INotifyColl
     /// <summary>Above this many rows to remove, <see cref="RemoveAll"/> rebuilds the list with one Reset.</summary>
     public const int BulkRemoveThreshold = 1_000;
 
+    /// <summary>Total size in bytes of the rows in <paramref name="ranges"/>; folders count 0, as in the panes.</summary>
+    /// <param name="ranges">Inclusive index ranges; indexes past the end are ignored.</param>
+    /// <returns>The sum. O(rows in the ranges): Ctrl+A over 100k rows is one pass.</returns>
+    public long BytesIn(IEnumerable<(int First, int Last)> ranges)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+        long total = 0;
+        foreach (var (first, last) in ranges)
+        {
+            for (int i = Math.Max(first, 0); i <= last && i < _items.Count; i++)
+            {
+                if (!_items[i].IsDirectory)
+                {
+                    total += _items[i].Size;
+                }
+            }
+        }
+
+        return total;
+    }
+
     /// <summary>A copy of the rows (to sort off the UI thread).</summary>
     /// <returns>The rows.</returns>
     public List<SearchHit> Snapshot() => [.. _items];

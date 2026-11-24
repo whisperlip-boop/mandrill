@@ -130,6 +130,7 @@
   "status.items.other": "{count} 個の項目",
   "status.selected.one": "{count} 個の項目を選択 ({size})",
   "status.selected.other": "{count} 個の項目を選択 ({size})",
+  "status.freeSpace": "{size}、ディスクの空き領域: {free}",
   "status.filtered": "{status} · フィルター: {shown} / {total}",
   "status.iconSize": "アイコンのサイズ: {size} px",
   "pane.error.invalidName": "「{name}」は有効な名前ではありません。名前に \\ / : * ? \" < > | は使用できません。また、CON などの予約名も使用できません。",

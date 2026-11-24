@@ -211,6 +211,12 @@
                 Grid.Column="2"
                 Foreground="{ThemeResource MandrillStatusBarForegroundBrush}"
                 TextTrimming="CharacterEllipsis" />
+            <!--  The single selected item's Shell info tip (WP3), shown while the message cell is empty.  -->
+            <TextBlock
+                x:Name="TipText"
+                Grid.Column="2"
+                Foreground="{ThemeResource MandrillStatusBarForegroundBrush}"
+                TextTrimming="CharacterEllipsis" />
             <TextBlock
                 x:Name="IndexText"
                 Grid.Column="3"

@@ -7,6 +7,7 @@ using Mandrill.Core.Diagnostics;
 using Mandrill.Core.IO;
 using Mandrill.Core.Localization;
 using Mandrill.Core.Platform;
+using Mandrill.Presentation.Common;
 using Mandrill.Presentation.Favorites;
 using Mandrill.Presentation.Layout;
 using Mandrill.Presentation.Panes;
@@ -226,6 +227,7 @@ public sealed partial class MainWindow : Window
                 old.Items.CollectionChanged -= OnItemsChanged;
                 old.Items.CurrentChanged -= ScheduleCount;
                 old.Items.Selection.Changed -= ScheduleCount;
+                old.SelectionStatus.Changed -= ScheduleCount;
                 old.PropertyChanged -= OnPaneChanged;
             }
 
@@ -235,6 +237,7 @@ public sealed partial class MainWindow : Window
                 active.Items.CollectionChanged += OnItemsChanged;
                 active.Items.CurrentChanged += ScheduleCount; // also a diff that changes only the filter's total (QA M2)
                 active.Items.Selection.Changed += ScheduleCount;
+                active.SelectionStatus.Changed += ScheduleCount; // the single item's info tip arrived (WP3)
                 active.PropertyChanged += OnPaneChanged;
             }
         }
@@ -311,12 +314,16 @@ public sealed partial class MainWindow : Window
         }
 
         IndexText.RegisterPropertyChangedCallback(UIElement.VisibilityProperty, (_, _) => SyncStatusSeparators());
+        TipText.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) => SyncStatusSeparators());
         SyncStatusSeparators();
     }
 
     private void SyncStatusSeparators()
     {
-        bool[] shown = StatusSeparators([.. StatusCells.Select(c => c.Visibility == Visibility.Visible && c.Text.Length > 0)]);
+        // The info tip shares the message cell; a pane or favorite message outranks it (WP3).
+        TipText.Visibility = StatusText.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        bool messageCell = StatusText.Text.Length > 0 || TipText.Text.Length > 0;
+        bool[] shown = StatusSeparators([.. StatusCells.Select(c => c.Visibility == Visibility.Visible && (c == StatusText ? messageCell : c.Text.Length > 0))]);
         var lines = StatusSeparatorLines;
         for (int i = 0; i < lines.Length; i++)
         {
@@ -398,14 +405,19 @@ public sealed partial class MainWindow : Window
         if (_statusPane is not { } vm)
         {
             CountText.Text = string.Empty;
+            TipText.Text = string.Empty;
             return;
         }
 
         int selected = vm.Items.Selection.Count;
+        string? single = selected == 1 && vm.Items.Current is { } folder && vm.Items.Selection.SelectedEntries() is [var entry]
+            ? Path.Combine(folder.Path, entry.Name)
+            : null;
+        vm.SelectionStatus.Update(selected, selected > 0 ? vm.Items.Selection.SelectedBytes() : 0, single, vm.Items.Current?.Path);
+        TipText.Text = vm.SelectionStatus.Tip;
         if (selected > 0)
         {
-            long bytes = vm.Items.Selection.SelectedBytes();
-            CountText.Text = Localizer.Current.Plural("status.selected", selected, ("count", selected.ToString("N0", CultureInfo.CurrentCulture)), ("size", SizeFormat.Bytes(bytes)));
+            CountText.Text = vm.SelectionStatus.Summary;
         }
         else
         {

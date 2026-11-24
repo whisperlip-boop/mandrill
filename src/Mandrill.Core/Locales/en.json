@@ -130,6 +130,7 @@
   "status.items.other": "{count} items",
   "status.selected.one": "{count} selected ({size})",
   "status.selected.other": "{count} selected ({size})",
+  "status.freeSpace": "{size}, Free disk space: {free}",
   "status.filtered": "{status} · Filter: {shown} / {total}",
   "status.iconSize": "Icon size: {size} px",
   "pane.error.invalidName": "“{name}” is not a valid name. A name can't contain \\ / : * ? \" < > | or be a reserved name such as CON.",

@@ -79,7 +79,11 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         _dispatcher = context.Dispatcher;
         _logger = context.LoggerFactory.CreateLogger<SearchViewModel>();
         _pane.PropertyChanged += OnPaneChanged;
+        SelectionStatus = new SelectionStatus(context.InfoTips, context.Dispatcher, _logger);
     }
+
+    /// <summary>The footer's selection text (summary and single-item tip), fed by the view; one format with the panes.</summary>
+    public SelectionStatus SelectionStatus { get; }
 
     /// <summary>The query being edited (bound to the query box).</summary>
     [ObservableProperty]
@@ -375,6 +379,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _pane.PropertyChanged -= OnPaneChanged;
+        SelectionStatus.Dispose();
         EndFollow(_follow);
         _running?.Cancel();
         _lifetime.Cancel();

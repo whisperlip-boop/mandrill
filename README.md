@@ -18,6 +18,10 @@ favorite, and find files by name across your local drives from Mandrill's own in
 - **Views**: Icons (several sizes), List and Details with sortable columns. Hidden files on request.
   Rubber band selection in every view: drag from an empty area, or from a row away from an item's icon and name.
   Shift adds to the selection, Ctrl toggles, Esc cancels and restores it, and the list scrolls at its edge.
+  In Icons view, file names wrap to up to four lines.
+- **Status bar**: the selection's count and size, in the panes and in the search window. For one selected item, the
+  Windows info tip follows (the text File Explorer shows for it, including what installed shell extensions add;
+  online-only cloud files are not downloaded for it). For two or more items, the drive's free disk space.
 - **Favorites**: save the current layout and every pane's folder as a named favorite and restore it with one click.
   Mandrill also reopens as you left it.
 - **Index search**: local fixed drives are indexed in the background and kept up to date. Each pane has a search
@@ -110,7 +114,7 @@ is not required. The installer needs [Inno Setup 6](https://jrsoftware.org/isinf
 dotnet build Mandrill.sln -c Release
 dotnet format Mandrill.sln --verify-no-changes
 dotnet publish src/Mandrill.App -c Release -r win-x64 --self-contained -o publish/
-& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.3 installer\Mandrill.iss
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.4 installer\Mandrill.iss
 ```
 
 `publish\Mandrill.exe` runs without installing. The installer is written to `dist\`. If Inno Setup is installed for

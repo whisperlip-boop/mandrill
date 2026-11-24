@@ -130,6 +130,7 @@
   "status.items.other": "{count} 个项目",
   "status.selected.one": "已选择 {count} 个项目（{size}）",
   "status.selected.other": "已选择 {count} 个项目（{size}）",
+  "status.freeSpace": "{size}，磁盘可用空间：{free}",
   "status.filtered": "{status} · 筛选：{shown} / {total}",
   "status.iconSize": "图标大小：{size} px",
   "pane.error.invalidName": "“{name}”不是有效的名称。名称不能包含下列任何字符：\\ / : * ? \" < > |，也不能是 CON 等保留名称。",

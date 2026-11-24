@@ -59,7 +59,11 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         ActiveTab = new PaneTab(0, string.Empty, ViewMode, SortState.Default) { IsActive = true };
         Tabs.Add(ActiveTab);
         context.Drives.Changed += OnDrivesChanged;
+        SelectionStatus = new SelectionStatus(context.InfoTips, context.Dispatcher, _logger);
     }
+
+    /// <summary>The status bar's selection text for this pane (summary and single-item tip), fed by the view.</summary>
+    public SelectionStatus SelectionStatus { get; }
 
     /// <summary>Raised when the view should select (and optionally rename) entries (architecture §5).</summary>
     public event Action<SelectionRequest>? SelectionRequested;
@@ -582,6 +586,7 @@ public sealed partial class PaneViewModel : ObservableObject, IDisposable
         _disposed = true;
         _lifetime.Cancel(); // not disposed: an operation finishing later may still read its token
         _context.Drives.Changed -= OnDrivesChanged;
+        SelectionStatus.Dispose();
         _scanner.Cancel();
         Supersede();
         Unsubscribe();

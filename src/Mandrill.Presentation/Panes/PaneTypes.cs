@@ -130,4 +130,7 @@ public sealed class PaneContext
     /// null shows only the access-denied state.
     /// </summary>
     public IFolderAccess? FolderAccess { get; init; }
+
+    /// <summary>Shell info tips for a single selection in the status bars (owner WP3); null shows none.</summary>
+    public IInfoTipService? InfoTips { get; init; }
 }

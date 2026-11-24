@@ -50,6 +50,13 @@ public sealed partial class SearchListAdapter : IList, INotifyCollectionChanged,
     /// <summary>Number of selected rows.</summary>
     public int SelectedCount => _selection.Count;
 
+    /// <summary>Raised when the selection changes (the status row's summary, as <c>SelectionModel.Changed</c> in panes).</summary>
+    public event Action? SelectionChanged;
+
+    /// <summary>Total size in bytes of the selected files (folders count 0).</summary>
+    /// <returns>The sum.</returns>
+    public long SelectedBytes() => _results.BytesIn(_selection.Ranges);
+
     /// <inheritdoc/>
     public object? this[int index]
     {
@@ -78,6 +85,7 @@ public sealed partial class SearchListAdapter : IList, INotifyCollectionChanged,
     {
         ArgumentNullException.ThrowIfNull(itemIndexRange);
         _selection.Add(itemIndexRange.FirstIndex, itemIndexRange.LastIndex);
+        SelectionChanged?.Invoke();
     }
 
     /// <inheritdoc/>
@@ -85,6 +93,7 @@ public sealed partial class SearchListAdapter : IList, INotifyCollectionChanged,
     {
         ArgumentNullException.ThrowIfNull(itemIndexRange);
         _selection.Remove(itemIndexRange.FirstIndex, itemIndexRange.LastIndex);
+        SelectionChanged?.Invoke();
     }
 
     /// <inheritdoc/>
@@ -134,5 +143,6 @@ public sealed partial class SearchListAdapter : IList, INotifyCollectionChanged,
         }
 
         CollectionChanged?.Invoke(this, e);
+        SelectionChanged?.Invoke(); // a removed or replaced row can change the count and the size
     }
 }

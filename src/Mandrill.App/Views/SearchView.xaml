@@ -184,7 +184,10 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="TipColumn" Width="Auto" />
             </Grid.ColumnDefinitions>
+            <!--  The state trims; the selection summary on the right (as in the pane's status bar) stays whole.  -->
             <TextBlock
                 x:Name="FooterText"
                 VerticalAlignment="Center"
@@ -200,6 +203,16 @@
                 VerticalAlignment="Center"
                 IsIndeterminate="True"
                 Visibility="Collapsed" />
+            <TextBlock
+                x:Name="SelectionSummary"
+                Grid.Column="3"
+                VerticalAlignment="Center" />
+            <!--  "| " and the single selected item's Shell info tip (WP3); its column takes a share only while it has one.  -->
+            <TextBlock
+                x:Name="SelectionTip"
+                Grid.Column="4"
+                VerticalAlignment="Center"
+                TextTrimming="CharacterEllipsis" />
         </Grid>
     </Grid>
 </UserControl>

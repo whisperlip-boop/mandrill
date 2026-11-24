@@ -130,6 +130,7 @@
   "status.items.other": "{count}개 항목",
   "status.selected.one": "{count}개 선택됨 ({size})",
   "status.selected.other": "{count}개 선택됨 ({size})",
+  "status.freeSpace": "{size}, 빈 디스크 공간: {free}",
   "status.filtered": "{status} · 필터: {shown} / {total}",
   "status.iconSize": "아이콘 크기: {size}px",
   "pane.error.invalidName": "“{name}”은(는) 사용할 수 없는 이름입니다. 이름에는 \\ / : * ? \" < > | 문자를 쓸 수 없고 CON 같은 예약된 이름도 쓸 수 없습니다.",

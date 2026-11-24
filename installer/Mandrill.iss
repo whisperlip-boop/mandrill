@@ -1,5 +1,5 @@
 ; Mandrill per-user installer (Inno Setup 6). Build after `dotnet publish ... -o publish/`:
-;   ISCC.exe /DAppVersion=1.0.3 installer\Mandrill.iss  ->  dist\Mandrill-1.0.3-setup-x64.exe
+;   ISCC.exe /DAppVersion=1.0.4 installer\Mandrill.iss  ->  dist\Mandrill-1.0.4-setup-x64.exe
 ; Uninstall removes only installed files; user data in %APPDATA%\mandrill\ stays.
 
 #ifndef AppVersion

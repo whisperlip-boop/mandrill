@@ -26,6 +26,7 @@ public sealed class AppServices : IDisposable
     private readonly ShellSta _iconsSta;
     private readonly ShellSta _miscSta;
     private readonly ContextMenuService _contextMenus;
+    private readonly ShellInfoTips _infoTips;
     private readonly DriveMonitor _drives;
     private readonly ChangeFeed _changeFeed;
     private readonly DirectoryLister _lister;
@@ -66,6 +67,7 @@ public sealed class AppServices : IDisposable
         ShellCommands = new ShellCommands(_miscSta, loggerFactory);
         Clipboard = new ClipboardService(loggerFactory); // WP-3.3: its own long-lived "clipboard" STA
         Launcher = new ShellLauncher(_miscSta, loggerFactory);
+        _infoTips = new ShellInfoTips(loggerFactory); // WP3: its own "infotip" STA
         Context = new PaneContext
         {
             ChangeFeed = _changeFeed,
@@ -74,6 +76,7 @@ public sealed class AppServices : IDisposable
             ShellLauncher = Launcher,
             OpenWith = (path, ct) => ShellCommands.OpenWithAsync(path, OwnerWindow, ct), // WP-3.3: no associated app -> "Open with"
             FolderAccess = new ElevatedFolderAccess(loggerFactory), // owner F14: elevation on demand only, on its own STA
+            InfoTips = _infoTips,
             Dispatcher = dispatcher,
             HomeFolder = homeFolder,
             HiddenFiles = ExplorerSettings.ReadHiddenFiles,
@@ -234,6 +237,7 @@ public sealed class AppServices : IDisposable
         Index.Dispose(); // before the drive monitor it listens to
         _contextMenus.Dispose();
         Clipboard.Dispose();
+        _infoTips.Dispose();
         Icons.Dispose();
         TypeNames.Dispose();
         _changeFeed.Dispose();

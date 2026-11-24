@@ -19,6 +19,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
@@ -130,6 +131,7 @@ public sealed partial class FileListView : UserControl
         Header.RenderTransform = _headerShift;
         EditCanvas.SizeChanged += (_, e) => EditCanvas.Clip = new RectangleGeometry { Rect = new Rect(0, 0, e.NewSize.Width, e.NewSize.Height) };
         HeaderClip.SizeChanged += (_, e) => HeaderClipRect.Rect = new Rect(0, 0, e.NewSize.Width, e.NewSize.Height);
+        ClipToBounds(ListHost);
         RenameBox.KeyDown += OnRenameKeyDown;
         RenameBox.LostFocus += (_, _) =>
         {
@@ -326,6 +328,14 @@ public sealed partial class FileListView : UserControl
         }
 
         return null;
+    }
+
+    // Past about 2^21 px of content (88k rows of 24 px) the list's ScrollViewer stops clipping its rows, which then draw
+    // below the list (over the search status line, past the pane). A XAML Clip does not stop it; a composition clip does.
+    internal static void ClipToBounds(UIElement element)
+    {
+        var visual = ElementCompositionPreview.GetElementVisual(element);
+        visual.Clip = visual.Compositor.CreateInsetClip();
     }
 
     /// <summary>
